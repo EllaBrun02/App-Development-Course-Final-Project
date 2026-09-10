@@ -1,0 +1,120 @@
+<%
+  const isNew = !article;
+  const isPublished = article && article.status === 'published';
+  const hasReturnedUpdate = article && article.pendingUpdate && article.pendingUpdate.status === 'returned';
+  const hasPendingUpdate = article && article.pendingUpdate && article.pendingUpdate.status === 'pending';
+
+  // Determine the editable content
+  // For a published article being edited: use the pendingUpdate.autoSave or pendingUpdate or current article content
+  let editTitle, editContent, editSummary, editImage;
+  if (isPublished) {
+    const pu = article.pendingUpdate || {};
+    const as = pu.autoSave || {};
+    editTitle   = as.title   || pu.title   || article.title;
+    editContent = as.content || pu.content || article.content;
+    editSummary = as.summary || pu.summary || article.summary;
+    editImage   = as.image   || pu.image   || article.image;
+  } else if (article) {
+    const as = article.autoSave || {};
+    editTitle   = as.title   || article.title;
+    editContent = as.content || article.content;
+    editSummary = as.summary || article.summary;
+    editImage   = as.image   || article.image;
+  } else {
+    editTitle = editContent = editSummary = editImage = '';
+  }
+
+  pageTitle = isNew ? 'New Article' : 'Edit Article';
+  extraScripts = `<script>
+    window.ARTICLE_ID = ${article ? JSON.stringify(article._id) : 'null'};
+    window.IS_PUBLISHED = ${isPublished};
+    window.HAS_PENDING_UPDATE = ${hasPendingUpdate};
+  </script>
+  <script src="/js/article-editor.js"></script>`;
+%>
+<%- include('../partials/header') %>
+
+<div class="editor-page">
+  <div class="editor-page-header">
+    <h1><%= isNew ? 'New Article' : 'Edit Article' %></h1>
+    <a href="/reporter" class="btn btn-outline">&larr; Dashboard</a>
+  </div>
+
+  <% if (hasPendingUpdate) { %>
+    <div class="info-banner">
+      <strong>Update pending review.</strong> Your submitted update is waiting for editor approval. You cannot submit another update until the current one is processed.
+    </div>
+  <% } %>
+
+  <% if (hasReturnedUpdate) { %>
+    <div class="warning-banner">
+      <strong>Editor returned your update.</strong> Note: <%= article.pendingUpdate.editorNote %><br>
+      Please make corrections and re-submit.
+    </div>
+  <% } %>
+
+  <% if (article && article.status === 'returned') { %>
+    <div class="warning-banner">
+      <strong>Editor returned this article.</strong> Note: <%= article.editorNote %><br>
+      Please make corrections and re-submit.
+    </div>
+  <% } %>
+
+  <% if (isPublished) { %>
+    <div class="info-banner">
+      <strong>Published article.</strong> The current published version will remain live until your update is approved by an editor.
+    </div>
+  <% } %>
+
+  <div id="autosave-status" class="autosave-status"></div>
+
+  <form id="article-form" class="article-edit-form" novalidate>
+    <div class="form-group">
+      <label for="title">Title <span class="required">*</span></label>
+      <input type="text" id="title" name="title" value="<%= editTitle %>" required maxlength="200" />
+    </div>
+
+    <div class="form-group">
+      <label for="category">Category <span class="required">*</span></label>
+      <select id="category" name="category" <% if (!isNew) { %>disabled<% } %>>
+        <% categories.forEach(cat => { %>
+          <option value="<%= cat %>" <%= (article && article.category === cat) ? 'selected' : '' %>><%= cat %></option>
+        <% }); %>
+      </select>
+      <% if (!isNew) { %>
+        <input type="hidden" name="category" value="<%= article.category %>" />
+      <% } %>
+    </div>
+
+    <div class="form-group">
+      <label for="image">Image URL</label>
+      <input type="url" id="image" name="image" value="<%= editImage %>" placeholder="https://..." />
+    </div>
+
+    <div class="form-group">
+      <label for="summary">Summary <span class="required">*</span></label>
+      <textarea id="summary" name="summary" rows="3" required maxlength="500" placeholder="Brief summary of the article..."><%= editSummary %></textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="content">Article Content <span class="required">*</span></label>
+      <textarea id="content" name="content" rows="20" required placeholder="Write your article here..."><%= editContent %></textarea>
+    </div>
+
+    <div id="form-error" class="error-message hidden"></div>
+
+    <div class="form-actions">
+      <% if (isNew) { %>
+        <button type="button" id="save-draft-btn" class="btn btn-outline">Save Draft</button>
+        <button type="button" id="submit-btn" class="btn btn-primary">Submit for Review</button>
+      <% } else if (isPublished && !hasPendingUpdate) { %>
+        <button type="button" id="submit-update-btn" class="btn btn-primary">Submit Update for Review</button>
+      <% } else if (article.status === 'returned' || article.status === 'draft') { %>
+        <button type="button" id="save-draft-btn" class="btn btn-outline">Save Draft</button>
+        <button type="button" id="submit-btn" class="btn btn-primary">Submit for Review</button>
+      <% } %>
+    </div>
+  </form>
+</div>
+
+<%- include('../partials/footer') %>

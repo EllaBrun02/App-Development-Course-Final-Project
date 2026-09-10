@@ -1,0 +1,76 @@
+<%
+  pageTitle = article.title;
+  extraHead = '<link rel="stylesheet" href="/css/article.css">';
+  extraScripts = '<script src="/js/article.js"></script>';
+%>
+<%- include('partials/header') %>
+
+<div class="content-with-sidebar">
+  <main class="main-content">
+    <article class="article-full" itemscope itemtype="https://schema.org/NewsArticle">
+      <header class="article-header">
+        <span class="article-category-badge"><%= article.category %></span>
+        <h1 class="article-title" itemprop="headline"><%= article.title %></h1>
+        <div class="article-meta">
+          <span class="article-author" itemprop="author"><%= article.author.name %></span>
+          <span class="meta-sep">&bull;</span>
+          <time itemprop="datePublished" datetime="<%= article.publishedAt.toISOString() %>">
+            <%= article.publishedAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %>
+          </time>
+          <span class="meta-sep">&bull;</span>
+          <span class="article-views"><%= article.views %> views</span>
+        </div>
+      </header>
+
+      <% if (article.image) { %>
+        <figure class="article-hero">
+          <img src="<%= article.image %>" alt="<%= article.title %>" loading="lazy" />
+        </figure>
+      <% } %>
+
+      <div class="article-summary" itemprop="description">
+        <p><%= article.summary %></p>
+      </div>
+
+      <div class="article-body" itemprop="articleBody">
+        <%- article.content.replace(/\n/g, '<br>') %>
+      </div>
+    </article>
+
+    <section class="comments-section" id="comments">
+      <h2 class="section-title">Comments (<span id="comment-count"><%= comments.length %></span>)</h2>
+
+      <div id="comments-list" class="comments-list">
+        <% comments.forEach(c => { %>
+          <div class="comment">
+            <div class="comment-header">
+              <strong class="comment-author"><%= c.author %></strong>
+              <time class="comment-time"><%= c.createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) %></time>
+            </div>
+            <p class="comment-body"><%= c.body %></p>
+          </div>
+        <% }); %>
+      </div>
+
+      <form id="comment-form" class="comment-form" data-article-id="<%= article._id %>">
+        <h3>Leave a Comment</h3>
+        <div class="form-group">
+          <label for="comment-author">Your Name</label>
+          <input type="text" id="comment-author" name="author" maxlength="50" required placeholder="Your name" />
+        </div>
+        <div class="form-group">
+          <label for="comment-body">Comment</label>
+          <textarea id="comment-body" name="body" rows="4" maxlength="1000" required placeholder="Write your comment..."></textarea>
+        </div>
+        <div id="comment-error" class="error-message hidden"></div>
+        <button type="submit" class="btn btn-primary">Post Comment</button>
+      </form>
+    </section>
+  </main>
+
+  <aside class="sidebar">
+    <%- include('partials/weather') %>
+  </aside>
+</div>
+
+<%- include('partials/footer') %>

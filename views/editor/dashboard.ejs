@@ -1,0 +1,85 @@
+<%
+  pageTitle = 'Editor Dashboard';
+  extraScripts = '<script src="/js/editor.js"></script>';
+%>
+<%- include('../partials/header') %>
+
+<div class="dashboard-page">
+  <div class="dashboard-header">
+    <h1>Editor Dashboard</h1>
+  </div>
+
+  <form class="filter-form" method="GET" action="/editor">
+    <select name="status" class="filter-select">
+      <option value="">All Statuses</option>
+      <option value="draft" <%= filterStatus === 'draft' ? 'selected' : '' %>>Draft</option>
+      <option value="pending" <%= filterStatus === 'pending' ? 'selected' : '' %>>Pending Review</option>
+      <option value="published" <%= filterStatus === 'published' ? 'selected' : '' %>>Published</option>
+      <option value="returned" <%= filterStatus === 'returned' ? 'selected' : '' %>>Returned</option>
+    </select>
+    <select name="category" class="filter-select">
+      <option value="">All Categories</option>
+      <% categories.forEach(cat => { %>
+        <option value="<%= cat %>" <%= filterCategory === cat ? 'selected' : '' %>><%= cat %></option>
+      <% }); %>
+    </select>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    <a href="/editor" class="btn btn-outline">Clear</a>
+  </form>
+
+  <% if (articles.length === 0) { %>
+    <div class="empty-state"><p>No articles match your filters.</p></div>
+  <% } else { %>
+    <div class="articles-table-wrap">
+      <table class="articles-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% articles.forEach(a => { %>
+            <tr>
+              <td class="col-title"><%= a.title %></td>
+              <td><%= a.author ? a.author.name : '—' %></td>
+              <td><span class="badge"><%= a.category %></span></td>
+              <td>
+                <span class="status-badge status-<%= a.status %>">
+                  <%= a.status === 'draft' ? 'Draft' :
+                      a.status === 'pending' ? 'Pending Review' :
+                      a.status === 'published' ? 'Published' :
+                      'Returned' %>
+                </span>
+                <% if (a.pendingUpdate && a.pendingUpdate.status === 'pending') { %>
+                  <span class="status-badge status-pending tag-small">Update Pending</span>
+                <% } %>
+              </td>
+              <td class="col-date">
+                <% if (a.publishedAt) { %>
+                  <%= a.publishedAt.toLocaleDateString() %>
+                <% } else { %>
+                  <%= a.createdAt.toLocaleDateString() %>
+                <% } %>
+              </td>
+              <td class="col-actions">
+                <a href="/editor/articles/<%= a._id %>" class="btn btn-sm btn-outline">Review</a>
+                <% if (a.status === 'published') { %>
+                  <a href="/article/<%= a._id %>" class="btn btn-sm btn-outline">View Live</a>
+                  <a href="/editor/analytics/<%= a._id %>" class="btn btn-sm btn-analytics">Analytics</a>
+                <% } %>
+                <button class="btn btn-sm btn-danger delete-btn" data-id="<%= a._id %>">Delete</button>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>

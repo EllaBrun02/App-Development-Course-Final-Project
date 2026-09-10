@@ -1,0 +1,14 @@
+<%
+  pageTitle = 'Error ' + code;
+  if (typeof user === 'undefined') user = null;
+  if (typeof userRole === 'undefined') userRole = null;
+%>
+<%- include('partials/header') %>
+<div class="error-page">
+  <div class="error-inner">
+    <div class="error-code"><%= code %></div>
+    <div class="error-msg"><%= message %></div>
+    <a href="/" class="btn btn-primary">Go Home</a>
+  </div>
+</div>
+<%- include('partials/footer') %>

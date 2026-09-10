@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof pageTitle !== 'undefined' ? pageTitle + ' | The Daily Web' : 'The Daily Web' %></title>
+  <link rel="stylesheet" href="/css/style.css">
+  <% if (typeof extraHead !== 'undefined') { %><%- extraHead %><% } %>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="/" class="logo">
+        <span class="logo-the">The</span><span class="logo-daily"> Daily</span><span class="logo-web"> Web</span>
+      </a>
+      <nav class="main-nav">
+        <a href="/">Home</a>
+        <% if (typeof userRole !== 'undefined' && userRole === 'reporter') { %>
+          <a href="/reporter">My Articles</a>
+          <a href="/reporter/new">New Article</a>
+        <% } %>
+        <% if (typeof userRole !== 'undefined' && userRole === 'editor') { %>
+          <a href="/editor">Editor Dashboard</a>
+        <% } %>
+        <% if (typeof user !== 'undefined' && user) { %>
+          <span class="nav-user">👤 <%= user %></span>
+          <a href="/logout" class="btn btn-outline">Sign Out</a>
+        <% } else { %>
+          <a href="/login" class="btn btn-primary">Sign In</a>
+        <% } %>
+      </nav>
+    </div>
+  </header>
+  <div class="page-wrapper">

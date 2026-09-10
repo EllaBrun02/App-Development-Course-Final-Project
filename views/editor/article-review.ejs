@@ -1,0 +1,71 @@
+<%
+  pageTitle = 'Review: ' + article.title;
+  const hasUpdate = article.pendingUpdate && article.pendingUpdate.status === 'pending';
+  extraScripts = `<script>
+    window.ARTICLE_ID = ${JSON.stringify(article._id.toString())};
+    window.HAS_UPDATE = ${hasUpdate};
+    window.ARTICLE_STATUS = ${JSON.stringify(article.status)};
+  </script>
+  <script src="/js/editor-review.js"></script>`;
+%>
+<%- include('../partials/header') %>
+
+<div class="review-page">
+  <div class="dashboard-header">
+    <h1>Article Review</h1>
+    <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
+  </div>
+
+  <% if (hasUpdate) { %>
+    <div class="update-compare">
+      <div class="version-panel">
+        <div class="version-label published">Currently Published</div>
+        <h2><%= article.title %></h2>
+        <p class="summary-text"><%= article.summary %></p>
+        <div class="body-preview"><%= article.content.substring(0, 500) %>...</div>
+      </div>
+      <div class="version-panel">
+        <div class="version-label pending">Pending Update</div>
+        <h2><%= article.pendingUpdate.title %></h2>
+        <p class="summary-text"><%= article.pendingUpdate.summary %></p>
+        <div class="body-preview"><%= article.pendingUpdate.content.substring(0, 500) %>...</div>
+      </div>
+    </div>
+    <div class="review-actions">
+      <button id="approve-update-btn" class="btn btn-primary">Approve Update</button>
+      <button id="return-update-btn" class="btn btn-danger">Return Update</button>
+    </div>
+  <% } else { %>
+    <div class="article-review-content">
+      <div class="review-meta">
+        <span class="badge"><%= article.category %></span>
+        <span class="status-badge status-<%= article.status %>"><%= article.status %></span>
+        <span>By: <%= article.author ? article.author.name : '—' %></span>
+      </div>
+      <h2 id="review-title"><%= article.title %></h2>
+      <% if (article.image) { %><img src="<%= article.image %>" alt="" class="review-image"><% } %>
+      <p class="review-summary"><strong>Summary:</strong> <%= article.summary %></p>
+      <div class="review-body"><%= article.content.replace(/\n/g, '<br>') %></div>
+    </div>
+
+    <% if (article.status === 'pending') { %>
+      <div class="review-actions">
+        <button id="publish-btn" class="btn btn-primary">Publish</button>
+        <button id="return-btn" class="btn btn-danger">Return to Reporter</button>
+      </div>
+    <% } %>
+  <% } %>
+
+  <div id="return-form" class="return-form hidden">
+    <label for="editor-note">Note for reporter <span class="required">*</span></label>
+    <textarea id="editor-note" rows="4" placeholder="Explain what needs to be corrected..."></textarea>
+    <div class="form-actions">
+      <button id="send-return-btn" class="btn btn-danger">Send Back</button>
+      <button id="cancel-return-btn" class="btn btn-outline">Cancel</button>
+    </div>
+  </div>
+
+  <div id="action-message" class="action-message hidden"></div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,82 @@
+<%
+  pageTitle = 'My Articles';
+  extraScripts = '<script src="/js/reporter.js"></script>';
+%>
+<%- include('../partials/header') %>
+
+<div class="dashboard-page">
+  <div class="dashboard-header">
+    <h1>My Articles</h1>
+    <a href="/reporter/new" class="btn btn-primary">+ New Article</a>
+  </div>
+
+  <% if (articles.length === 0) { %>
+    <div class="empty-state">
+      <p>You haven't written any articles yet.</p>
+      <a href="/reporter/new" class="btn btn-primary">Write Your First Article</a>
+    </div>
+  <% } else { %>
+    <div class="articles-table-wrap">
+      <table class="articles-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% articles.forEach(a => { %>
+            <tr>
+              <td class="col-title">
+                <% if (a.status === 'published') { %>
+                  <a href="/article/<%= a._id %>"><%= a.title %></a>
+                <% } else { %>
+                  <%= a.title %>
+                <% } %>
+              </td>
+              <td><span class="badge"><%= a.category %></span></td>
+              <td>
+                <span class="status-badge status-<%= a.status %>">
+                  <%= a.status === 'draft' ? 'Draft' :
+                      a.status === 'pending' ? 'Pending Review' :
+                      a.status === 'published' ? 'Published' :
+                      'Returned for Corrections' %>
+                </span>
+                <% if (a.pendingUpdate && a.pendingUpdate.status) { %>
+                  <span class="status-badge status-<%= a.pendingUpdate.status %> tag-small">
+                    Update: <%= a.pendingUpdate.status === 'pending' ? 'Pending' : 'Returned' %>
+                  </span>
+                <% } %>
+              </td>
+              <td class="col-date">
+                <% if (a.publishedAt) { %>
+                  <%= a.publishedAt.toLocaleDateString() %>
+                <% } else { %>
+                  <%= a.createdAt.toLocaleDateString() %>
+                <% } %>
+              </td>
+              <td class="col-actions">
+                <% if (['draft', 'returned'].includes(a.status)) { %>
+                  <a href="/reporter/articles/<%= a._id %>/edit" class="btn btn-sm btn-outline">Edit</a>
+                <% } else if (a.status === 'published') { %>
+                  <a href="/article/<%= a._id %>" class="btn btn-sm btn-outline">View</a>
+                  <a href="/reporter/articles/<%= a._id %>/edit" class="btn btn-sm btn-outline">Edit Update</a>
+                <% } %>
+                <% if (a.status === 'returned') { %>
+                  <div class="editor-note-inline">
+                    <strong>Editor note:</strong> <%= a.editorNote %>
+                  </div>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('../partials/footer') %>
