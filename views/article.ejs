@@ -1,9 +1,10 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = article.title;
   extraHead = '<link rel="stylesheet" href="/css/article.css">';
   extraScripts = '<script src="/js/article.js"></script>';
 %>
-<%- include('partials/header') %>
+<%- include('partials/header', { pageTitle, extraHead }) %>
 
 <div class="content-with-sidebar">
   <main class="main-content">
@@ -73,4 +74,4 @@
   </aside>
 </div>
 
-<%- include('partials/footer') %>
+<%- include('partials/footer', { extraScripts }) %>

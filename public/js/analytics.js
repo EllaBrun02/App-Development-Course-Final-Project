@@ -4,6 +4,7 @@
   const ARTICLE_ID = window.ARTICLE_ID;
   const chartLoading = document.getElementById('chart-loading');
   const timeRangeSelect = document.getElementById('time-range');
+  const totalViewsStat = document.getElementById('total-views-stat');
   let chart = null;
 
   function getHoursAgo(range) {
@@ -24,9 +25,19 @@
       const hoursAgo = getHoursAgo(range);
       const cutoff = hoursAgo ? new Date(Date.now() - hoursAgo * 3600 * 1000) : null;
 
+      // Update total views to match chart data (all-time sum from ViewStat records)
+      const allTimeTotal = stats.reduce((sum, s) => sum + (s.count || 0), 0);
+      if (totalViewsStat) totalViewsStat.textContent = allTimeTotal;
+
       const filtered = cutoff
         ? stats.filter(s => new Date(s.hour) >= cutoff)
         : stats;
+
+      if (filtered.length === 0) {
+        chartLoading.textContent = 'No view data for the selected time range.';
+        if (chart) { chart.destroy(); chart = null; }
+        return;
+      }
 
       const labels = filtered.map(s => {
         const d = new Date(s.hour);
@@ -49,14 +60,14 @@
           type: 'line',
           xMin: p.idx,
           xMax: p.idx,
-          borderColor: '#E74C3C',
+          borderColor: '#b45b3d',
           borderWidth: 2,
           borderDash: [4, 4],
           label: {
             content: '📢 Published',
             enabled: true,
             position: 'start',
-            backgroundColor: '#E74C3C',
+            backgroundColor: '#b45b3d',
             color: '#fff',
             font: { size: 11, family: 'Arial' },
           },
@@ -73,19 +84,19 @@
           datasets: [{
             label: 'Views per hour',
             data: counts,
-            borderColor: '#4A90D9',
-            backgroundColor: 'rgba(74,144,217,0.12)',
+            borderColor: '#6535b5',
+            backgroundColor: 'rgba(101,53,181,0.1)',
             fill: true,
             tension: 0.3,
             pointRadius: counts.map((_, i) => publishPoints.some(p => p.idx === i) ? 6 : 2),
             pointBackgroundColor: counts.map((_, i) =>
-              publishPoints.some(p => p.idx === i) ? '#E74C3C' : '#4A90D9'
+              publishPoints.some(p => p.idx === i) ? '#b45b3d' : '#6535b5'
             ),
           }],
         },
         options: {
           responsive: true,
-          maintainAspectRatio: true,
+          maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -132,7 +143,7 @@
             const bottomY = chart.scales.y.bottom;
             ctx.save();
             ctx.setLineDash([4, 4]);
-            ctx.strokeStyle = '#E74C3C';
+            ctx.strokeStyle = '#b45b3d';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(x, topY);

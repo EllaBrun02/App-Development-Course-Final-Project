@@ -5,6 +5,31 @@
   const HAS_UPDATE = window.HAS_UPDATE;
   const ARTICLE_STATUS = window.ARTICLE_STATUS;
 
+  // ── Diff rendering ────────────────────────────────────────────────────────
+  if (HAS_UPDATE && window.Diff && window.DIFF_OLD && window.DIFF_NEW) {
+    function renderDiff(oldText, newText, oldEl, newEl) {
+      const parts = Diff.diffWords(oldText || '', newText || '');
+      let oldHtml = '', newHtml = '';
+      parts.forEach(function(p) {
+        const safe = p.value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        if (p.removed) {
+          oldHtml += '<del class="diff-del">' + safe + '</del>';
+        } else if (p.added) {
+          newHtml += '<ins class="diff-add">' + safe + '</ins>';
+        } else {
+          oldHtml += safe;
+          newHtml += safe;
+        }
+      });
+      oldEl.innerHTML = oldHtml;
+      newEl.innerHTML = newHtml;
+    }
+
+    renderDiff(DIFF_OLD.title,   DIFF_NEW.title,   document.getElementById('diff-title-old'),   document.getElementById('diff-title-new'));
+    renderDiff(DIFF_OLD.summary, DIFF_NEW.summary, document.getElementById('diff-summary-old'), document.getElementById('diff-summary-new'));
+    renderDiff(DIFF_OLD.content, DIFF_NEW.content, document.getElementById('diff-content-old'), document.getElementById('diff-content-new'));
+  }
+
   const actionMsg = document.getElementById('action-message');
   const returnForm = document.getElementById('return-form');
   const editorNote = document.getElementById('editor-note');
