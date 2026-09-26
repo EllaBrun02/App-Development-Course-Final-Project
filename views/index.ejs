@@ -1,9 +1,10 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Latest News';
   extraHead = '<link rel="stylesheet" href="/css/home.css">';
   extraScripts = '<script src="/js/home.js"></script>';
 %>
-<%- include('partials/header') %>
+<%- include('partials/header', { pageTitle, extraHead }) %>
 
 <div class="content-with-sidebar">
   <main class="main-content">
@@ -53,4 +54,4 @@
   </aside>
 </div>
 
-<%- include('partials/footer') %>
+<%- include('partials/footer', { extraScripts }) %>

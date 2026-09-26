@@ -1,9 +1,10 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Error ' + code;
   if (typeof user === 'undefined') user = null;
   if (typeof userRole === 'undefined') userRole = null;
 %>
-<%- include('partials/header') %>
+<%- include('partials/header', { pageTitle, extraHead }) %>
 <div class="error-page">
   <div class="error-inner">
     <div class="error-code"><%= code %></div>
@@ -11,4 +12,4 @@
     <a href="/" class="btn btn-primary">Go Home</a>
   </div>
 </div>
-<%- include('partials/footer') %>
+<%- include('partials/footer', { extraScripts }) %>

@@ -63,7 +63,7 @@ app.use((req, res) => {
 // Global error handler
 app.use((err, req, res, next) => {
   logger.error(`Unhandled error: ${err.stack}`);
-  res.status(500).render('error', { message: 'Internal server error', code: 500 });
+  require('./utils/validation').errorResponse(err, req, res);
 });
 
 app.listen(PORT, () => {

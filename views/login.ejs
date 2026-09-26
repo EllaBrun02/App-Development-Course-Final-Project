@@ -1,8 +1,9 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Sign In';
   user = null; userRole = null;
 %>
-<%- include('partials/header') %>
+<%- include('partials/header', { pageTitle, extraHead }) %>
 
 <div class="auth-page">
   <div class="auth-card">
@@ -30,4 +31,4 @@
   </div>
 </div>
 
-<%- include('partials/footer') %>
+<%- include('partials/footer', { extraScripts }) %>

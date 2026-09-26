@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+router.param('id', (req, res, next, id) => {
+  try { require('../utils/validation').objectId(id); next(); } catch (err) { next(err); }
+});
 const { requireRole } = require('../middleware/auth');
 const rc = require('../controllers/reporterController');
 

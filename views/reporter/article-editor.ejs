@@ -1,4 +1,5 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   const isNew = !article;
   const isPublished = article && article.status === 'published';
   const hasReturnedUpdate = article && article.pendingUpdate && article.pendingUpdate.status === 'returned';
@@ -10,29 +11,32 @@
   if (isPublished) {
     const pu = article.pendingUpdate || {};
     const as = pu.autoSave || {};
-    editTitle   = as.title   || pu.title   || article.title;
-    editContent = as.content || pu.content || article.content;
-    editSummary = as.summary || pu.summary || article.summary;
-    editImage   = as.image   || pu.image   || article.image;
+    editTitle   = as.title   ?? pu.title   ?? article.title;
+    editContent = as.content ?? pu.content ?? article.content;
+    editSummary = as.summary ?? pu.summary ?? article.summary;
+    editImage   = as.image   ?? pu.image   ?? article.image;
   } else if (article) {
     const as = article.autoSave || {};
-    editTitle   = as.title   || article.title;
-    editContent = as.content || article.content;
-    editSummary = as.summary || article.summary;
-    editImage   = as.image   || article.image;
+    editTitle   = as.title   ?? article.title;
+    editContent = as.content ?? article.content;
+    editSummary = as.summary ?? article.summary;
+    editImage   = as.image   ?? article.image;
   } else {
     editTitle = editContent = editSummary = editImage = '';
   }
 
   pageTitle = isNew ? 'New Article' : 'Edit Article';
   extraScripts = `<script>
+    window.ARTICLE_REVISION = ${article ? article.__v : 0};
+    window.ARTICLE_USER = ${JSON.stringify(userId)};
+    window.ARTICLE_EDITABLE = ${!article || ['draft','returned'].includes(article.status) || (isPublished && !hasPendingUpdate)};
     window.ARTICLE_ID = ${article ? JSON.stringify(article._id) : 'null'};
     window.IS_PUBLISHED = ${isPublished};
     window.HAS_PENDING_UPDATE = ${hasPendingUpdate};
   </script>
   <script src="/js/article-editor.js"></script>`;
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="editor-page">
   <div class="editor-page-header">
@@ -66,7 +70,7 @@
     </div>
   <% } %>
 
-  <div id="autosave-status" class="autosave-status"></div>
+  <div id="autosave-status" role="status" aria-live="polite" class="autosave-status"></div>
 
   <form id="article-form" class="article-edit-form" novalidate>
     <div class="form-group">
@@ -117,4 +121,4 @@
   </form>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>

@@ -1,4 +1,5 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Review: ' + article.title;
   const hasUpdate = article.pendingUpdate && article.pendingUpdate.status === 'pending';
   extraScripts = `<script>
@@ -8,11 +9,12 @@
   </script>
   <script src="/js/editor-review.js"></script>`;
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="review-page">
   <div class="dashboard-header">
     <h1>Article Review</h1>
+    <a class="btn btn-outline" href="/editor/articles/<%= article._id %>/edit?target=<%= hasUpdate ? 'update' : 'main' %>">Edit this version</a>
     <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
   </div>
 
@@ -22,13 +24,13 @@
         <div class="version-label published">Currently Published</div>
         <h2><%= article.title %></h2>
         <p class="summary-text"><%= article.summary %></p>
-        <div class="body-preview"><%= article.content.substring(0, 500) %>...</div>
+        <div class="body-preview" style="white-space: pre-wrap"><%= article.content %></div>
       </div>
       <div class="version-panel">
         <div class="version-label pending">Pending Update</div>
         <h2><%= article.pendingUpdate.title %></h2>
         <p class="summary-text"><%= article.pendingUpdate.summary %></p>
-        <div class="body-preview"><%= article.pendingUpdate.content.substring(0, 500) %>...</div>
+        <div class="body-preview" style="white-space: pre-wrap"><%= article.pendingUpdate.content %></div>
       </div>
     </div>
     <div class="review-actions">
@@ -45,7 +47,7 @@
       <h2 id="review-title"><%= article.title %></h2>
       <% if (article.image) { %><img src="<%= article.image %>" alt="" class="review-image"><% } %>
       <p class="review-summary"><strong>Summary:</strong> <%= article.summary %></p>
-      <div class="review-body"><%= article.content.replace(/\n/g, '<br>') %></div>
+      <div class="review-body" style="white-space: pre-wrap"><%= article.content %></div>
     </div>
 
     <% if (article.status === 'pending') { %>
@@ -68,4 +70,4 @@
   <div id="action-message" class="action-message hidden"></div>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>

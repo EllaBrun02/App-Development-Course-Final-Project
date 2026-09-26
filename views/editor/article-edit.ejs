@@ -1,0 +1,16 @@
+<%
+ let pageTitle='Edit article version',extraHead='',extraScripts='<script src="/js/editor-edit.js"></script>';
+%>
+<%- include('../partials/header',{pageTitle,extraHead}) %>
+<div class="editor-page">
+ <h1>Edit <%= target === 'update' ? 'pending update' : 'article' %></h1>
+ <form id="version-form" data-id="<%= article._id %>" data-target="<%= target %>" data-revision="<%= article.__v %>">
+ <% for (const field of ['title','summary','content','image']) { %>
+ <div class="form-group"><label for="<%= field %>"><%= field %></label><textarea id="<%= field %>" name="<%= field %>" rows="<%= field === 'content' ? 18 : 2 %>"><%= editableContent[field] %></textarea></div>
+ <% } %>
+ <button class="btn btn-primary" type="submit">Save this version</button>
+ <a class="btn btn-outline" href="/editor/articles/<%= article._id %>">Back to review</a>
+ <p id="edit-message" role="status"></p>
+ </form>
+</div>
+<%- include('../partials/footer',{extraScripts}) %>

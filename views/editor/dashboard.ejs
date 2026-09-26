@@ -1,15 +1,18 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Editor Dashboard';
   extraScripts = '<script src="/js/editor.js"></script>';
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="dashboard-page">
   <div class="dashboard-header">
     <h1>Editor Dashboard</h1>
+    <a class="btn btn-outline" href="/editor/manage">Manage users, comments and view records</a>
   </div>
 
   <form class="filter-form" method="GET" action="/editor">
+    <label for="article-search">Search articles</label><input id="article-search" name="search" type="search" maxlength="200" value="<%= search %>">
     <select name="status" class="filter-select">
       <option value="">All Statuses</option>
       <option value="draft" <%= filterStatus === 'draft' ? 'selected' : '' %>>Draft</option>
@@ -82,4 +85,4 @@
   <% } %>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>
