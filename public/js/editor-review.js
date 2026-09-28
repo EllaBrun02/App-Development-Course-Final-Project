@@ -13,7 +13,9 @@
     actionMsg.textContent = text;
     actionMsg.className = 'action-message ' + type;
     actionMsg.classList.remove('hidden');
-    actionMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Audit #31: respect the user's Reduced Motion preference
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    actionMsg.scrollIntoView({ behavior, block: 'center' });
   }
 
   async function apiPatch(url, body) {

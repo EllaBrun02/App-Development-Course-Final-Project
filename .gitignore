@@ -1,0 +1,5 @@
+# Local per-machine session secret — never commit (audit #34)
+config/session-secret.key
+
+# Runtime logs
+logs/*.log

@@ -12,8 +12,35 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const path = require('path');
+const readline = require('readline');
 
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/the-daily-web');
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/the-daily-web';
+
+// Audit #36: seeding DELETES all existing data. Warn loudly and require
+// confirmation (pass --yes to skip, e.g. in scripts).
+async function confirmWipe() {
+  console.log('╔══════════════════════════════════════════════════════════════╗');
+  console.log('║  ⚠ WARNING: this will DELETE ALL existing data in the DB     ║');
+  console.log('║  (users, articles, comments, view stats) and replace it       ║');
+  console.log('║  with demo data.                                              ║');
+  console.log('╚══════════════════════════════════════════════════════════════╝');
+  console.log(`Database: ${MONGO_URI}\n`);
+
+  if (process.argv.includes('--yes')) return;
+  if (!process.stdin.isTTY) {
+    console.error('Refusing to wipe the database non-interactively. Re-run with --yes to confirm.');
+    process.exit(1);
+  }
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise(resolve => rl.question('Type "yes" to continue: ', resolve));
+  rl.close();
+  if (answer.trim().toLowerCase() !== 'yes') {
+    console.log('Aborted. No data was changed.');
+    process.exit(0);
+  }
+}
+
+mongoose.connect(MONGO_URI);
 
 const User = require('../models/User');
 const Article = require('../models/Article');
@@ -83,6 +110,7 @@ function genSummary(title) {
 }
 
 async function seed() {
+  await confirmWipe();
   console.log('Clearing existing data...');
   await User.deleteMany({});
   await Article.deleteMany({});
@@ -182,14 +210,32 @@ async function seed() {
   console.log('Generating view statistics...');
   const publishedArticles = inserted.filter(a => a.status === 'published');
   const viewStatDocs = [];
+  const now = new Date();
 
-  for (const article of publishedArticles.slice(0, 100)) { // stats for first 100 published
+  // Helper: attach a publish/update event to the matching hour bucket
+  function addPublishEvent(articleId, eventTime) {
+    const evHour = new Date(eventTime);
+    evHour.setMinutes(0, 0, 0);
+    const existingDoc = viewStatDocs.find(
+      d => d.article.toString() === articleId.toString() &&
+           d.hour.getTime() === evHour.getTime()
+    );
+    if (existingDoc) {
+      existingDoc.publishEvents.push(eventTime);
+    } else {
+      viewStatDocs.push({ article: articleId, hour: evHour, count: randInt(5, 30), publishEvents: [eventTime] });
+    }
+  }
+
+  for (const [ai, article] of publishedArticles.slice(0, 100).entries()) { // stats for first 100 published
     const daysBack = 30;
     for (let d = daysBack; d >= 0; d--) {
       for (let h = 0; h < 24; h += 3) { // every 3 hours
         const hour = new Date(Date.now() - d * 24 * 3600 * 1000);
         hour.setHours(h, 0, 0, 0);
-        if (hour > article.publishedAt) {
+        // Audit #25: never generate view records in the future — only hours
+        // that already passed, and only after the article was published.
+        if (hour > article.publishedAt && hour <= now) {
           // More views around mid-day, less at night
           const timeBoost = (h >= 8 && h <= 20) ? 3 : 1;
           const freshBoost = d < 3 ? 5 : (d < 7 ? 3 : 1);
@@ -200,17 +246,23 @@ async function seed() {
         }
       }
     }
-    // Record publish events
-    const pubHour = new Date(article.publishedAt);
-    pubHour.setMinutes(0, 0, 0);
-    const existingDoc = viewStatDocs.find(
-      d => d.article.toString() === article._id.toString() &&
-           d.hour.getTime() === pubHour.getTime()
-    );
-    if (existingDoc) {
-      existingDoc.publishEvents.push(article.publishedAt);
-    } else {
-      viewStatDocs.push({ article: article._id, hour: pubHour, count: randInt(5, 30), publishEvents: [article.publishedAt] });
+    // Record the initial publish event
+    addPublishEvent(article._id, article.publishedAt);
+
+    // Audit #24: give some articles multiple APPROVED updates after their
+    // initial publication, so the Impact Analytics graph can demonstrate
+    // view behaviour before/after each update marker.
+    if (ai < 10) {
+      const publishedMs = article.publishedAt.getTime();
+      const span = now.getTime() - publishedMs;
+      if (span > 2 * 24 * 3600 * 1000) { // published at least 2 days ago
+        const updates = randInt(2, 3);
+        for (let u = 1; u <= updates; u++) {
+          // spread updates between publication and now (always in the past)
+          const evTime = new Date(publishedMs + Math.round((span * u) / (updates + 1)));
+          addPublishEvent(article._id, evTime);
+        }
+      }
     }
   }
 
@@ -226,11 +278,16 @@ async function seed() {
   for (const article of publishedArticles.slice(0, 200)) {
     const commentCount = randInt(0, 8);
     for (let c = 0; c < commentCount; c++) {
+      // Audit #25: comment timestamps must also never be in the future
+      const createdAt = new Date(Math.min(
+        article.publishedAt.getTime() + randInt(1, 72) * 3600 * 1000,
+        Date.now()
+      ));
       commentDocs.push({
         article: article._id,
         author: rand(COMMENT_AUTHORS),
         body: rand(COMMENT_BODIES),
-        createdAt: new Date(article.publishedAt.getTime() + randInt(1, 72) * 3600 * 1000),
+        createdAt,
         updatedAt: new Date(),
       });
     }

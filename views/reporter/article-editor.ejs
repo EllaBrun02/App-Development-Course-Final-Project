@@ -66,7 +66,8 @@
     </div>
   <% } %>
 
-  <div id="autosave-status" class="autosave-status"></div>
+  <%# Audit #31: announce save/error status to assistive technology %>
+  <div id="autosave-status" class="autosave-status" role="status" aria-live="polite"></div>
 
   <form id="article-form" class="article-edit-form" novalidate>
     <div class="form-group">
@@ -101,7 +102,7 @@
       <textarea id="content" name="content" rows="20" required placeholder="Write your article here..."><%= editContent %></textarea>
     </div>
 
-    <div id="form-error" class="error-message hidden"></div>
+    <div id="form-error" class="error-message hidden" role="alert" tabindex="-1"></div>
 
     <div class="form-actions">
       <% if (isNew) { %>

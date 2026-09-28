@@ -20,10 +20,16 @@
     };
   }
 
+  // Audit #31: respect the user's Reduced Motion preference
+  function scrollBehavior() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  }
+
   function showError(msg) {
     formError.textContent = msg;
     formError.classList.remove('hidden');
-    formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    formError.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+    formError.focus(); // audit #31: move focus so screen readers announce it
   }
 
   function hideError() { formError.classList.add('hidden'); }

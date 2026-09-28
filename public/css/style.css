@@ -276,3 +276,54 @@ button.btn { appearance: none; }
   .col-actions { flex-direction: column; }
   .articles-table td, .articles-table th { padding: 0.5rem 0.6rem; }
 }
+
+/* ===================== Audit 19-38 additions ===================== */
+
+/* #31: respect the user's Reduced Motion preference for page scrolling */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; }
+}
+
+/* #30: full, safely-escaped article text with real line breaks */
+.review-body { white-space: pre-line; }
+.body-full {
+  white-space: pre-line;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+.compare-image {
+  width: 100%; max-height: 200px; object-fit: cover;
+  border-radius: var(--radius); margin: 0.75rem 0;
+  background: #dde5ef;
+}
+.compare-image-missing {
+  height: 80px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg); border: 1px dashed var(--border); border-radius: var(--radius);
+  color: var(--text-muted); font-family: Arial, sans-serif; font-size: 0.85rem;
+  margin: 0.75rem 0;
+}
+
+/* #26: stale-weather warning */
+.weather-stale {
+  margin-top: 0.5rem; padding: 0.4rem 0.6rem; border-radius: var(--radius);
+  background: #FEF3C7; color: #92400E;
+  font-family: Arial, sans-serif; font-size: 0.78rem;
+}
+
+/* #28: editor dashboard pagination */
+.pagination {
+  display: flex; align-items: center; justify-content: center; gap: 1rem;
+  margin-top: 1.25rem; font-family: Arial, sans-serif; font-size: 0.88rem;
+}
+.pagination-info { color: var(--text-muted); }
+
+/* #32: on mobile, show the sidebar (weather + categories) before the feed */
+@media (max-width: 900px) {
+  .home-layout { flex-direction: column-reverse; }
+}
+
+/* #33: reserve space for images so late loads / failures don't shift content */
+.article-hero { min-height: 180px; background: #dde5ef; }
+.article-card-img { min-height: 140px; }

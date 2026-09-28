@@ -17,18 +17,34 @@
   </div>
 
   <% if (hasUpdate) { %>
+    <%
+      // Audit #30: the editor must see everything that changed, including the
+      // image, and the full content of both versions (scrollable), rendered
+      // safely with real line breaks.
+      const imageChanged = (article.image || '') !== (article.pendingUpdate.image || '');
+    %>
     <div class="update-compare">
       <div class="version-panel">
         <div class="version-label published">Currently Published</div>
         <h2><%= article.title %></h2>
+        <% if (article.image) { %>
+          <img src="<%= article.image %>" alt="Published version image" class="compare-image" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'compare-image-missing',textContent:'Image failed to load'}))">
+        <% } else { %>
+          <div class="compare-image-missing">No image</div>
+        <% } %>
         <p class="summary-text"><%= article.summary %></p>
-        <div class="body-preview"><%= article.content.substring(0, 500) %>...</div>
+        <div class="body-preview body-full"><%= article.content %></div>
       </div>
       <div class="version-panel">
-        <div class="version-label pending">Pending Update</div>
+        <div class="version-label pending">Pending Update <% if (imageChanged) { %><span class="badge">Image changed</span><% } %></div>
         <h2><%= article.pendingUpdate.title %></h2>
+        <% if (article.pendingUpdate.image) { %>
+          <img src="<%= article.pendingUpdate.image %>" alt="Pending update image" class="compare-image" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'compare-image-missing',textContent:'Image failed to load'}))">
+        <% } else { %>
+          <div class="compare-image-missing">No image</div>
+        <% } %>
         <p class="summary-text"><%= article.pendingUpdate.summary %></p>
-        <div class="body-preview"><%= article.pendingUpdate.content.substring(0, 500) %>...</div>
+        <div class="body-preview body-full"><%= article.pendingUpdate.content %></div>
       </div>
     </div>
     <div class="review-actions">
@@ -43,9 +59,11 @@
         <span>By: <%= article.author ? article.author.name : '—' %></span>
       </div>
       <h2 id="review-title"><%= article.title %></h2>
-      <% if (article.image) { %><img src="<%= article.image %>" alt="" class="review-image"><% } %>
+      <% if (article.image) { %><img src="<%= article.image %>" alt="" class="review-image" onerror="this.style.display='none'"><% } %>
       <p class="review-summary"><strong>Summary:</strong> <%= article.summary %></p>
-      <div class="review-body"><%= article.content.replace(/\n/g, '<br>') %></div>
+      <%# Audit #30: escape the content and keep line breaks via CSS,
+          instead of injecting <br> text into an escaped output %>
+      <div class="review-body"><%= article.content %></div>
     </div>
 
     <% if (article.status === 'pending') { %>
@@ -65,7 +83,7 @@
     </div>
   </div>
 
-  <div id="action-message" class="action-message hidden"></div>
+  <div id="action-message" class="action-message hidden" role="status" aria-live="polite"></div>
 </div>
 
 <%- include('../partials/footer') %>

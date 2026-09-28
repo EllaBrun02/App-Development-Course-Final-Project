@@ -5,7 +5,9 @@
 %>
 <%- include('partials/header') %>
 
-<div class="content-with-sidebar">
+<%# Audit #32: .home-layout places the sidebar (weather + categories)
+    before the feed on mobile so it stays reachable %>
+<div class="content-with-sidebar home-layout">
   <main class="main-content">
     <div class="feed-toolbar">
       <div class="search-row">

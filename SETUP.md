@@ -16,7 +16,7 @@ npm --version    # should print 9.x.x or higher
 ## 2. Install MongoDB (Community Edition)
 
 **Download:** https://www.mongodb.com/try/download/community  
-**Choose:** Version 7.x, Windows, .msi installer
+**Choose:** Version 7.x for your operating system (Windows `.msi`, macOS via Homebrew `brew install mongodb-community`, or Docker: `docker run -d -p 27017:27017 mongo:7`)
 
 During installation:
 - Check "Install MongoDB as a Service" — this makes it start automatically with Windows
@@ -65,11 +65,7 @@ These are installed automatically by `npm install`. Listed here for reference:
 
 ## 4. First-Time Setup Steps
 
-Open a terminal (PowerShell or Command Prompt) in the project folder:
-
-```
-C:\Users\ebrun\OneDrive - NVIDIA Corporation\Meetings\Documents\Study\P1\Code
-```
+Open a terminal in the project root folder (the folder containing `package.json`).
 
 **Step 1 — Install all npm packages:**
 ```bash
@@ -80,6 +76,8 @@ npm install
 ```bash
 npm run seed
 ```
+> ⚠️ **WARNING:** seeding **deletes all existing data** in the target database before inserting demo data. The script asks for confirmation (`--yes` skips the prompt).
+
 This creates:
 - 500 articles in various states
 - 1 editor user + 5 reporter users
@@ -115,7 +113,7 @@ By default the app runs with sensible defaults. You can override them by setting
 |---|---|---|
 | `PORT` | `3000` | Port the server listens on |
 | `MONGO_URI` | `mongodb://localhost:27017/the-daily-web` | MongoDB connection string |
-| `SESSION_SECRET` | `thedailyweb_secret_2024` | Secret key for signing sessions |
+| `SESSION_SECRET` | auto-generated, stored in `config/session-secret.key` (gitignored) | Secret key for signing sessions |
 
 To set them temporarily (PowerShell):
 ```powershell
