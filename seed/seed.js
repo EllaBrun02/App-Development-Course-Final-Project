@@ -100,6 +100,13 @@ async function seed() {
     role: 'editor',
   });
 
+  await User.create({
+    username: 'editor2',
+    passwordHash: await hash('editor123'),
+    name: 'Ethan Editor',
+    role: 'editor',
+  });
+
   const reporterUsers = [];
   const reporterNames = ['Alice Reporter', 'Bob Writer', 'Carol Journalist', 'David Press', 'Elena News'];
   for (let i = 0; i < 5; i++) {
@@ -155,7 +162,7 @@ async function seed() {
       title, content: genContent(title), summary: genSummary(title),
       image: rand(IMAGES), category: cat, author: author._id,
       status, publishedAt, editorNote: editorNote || '',
-      views: status === 'published' ? randInt(10, 5000) : 0,
+      views: 0,
     };
     if (autoSave) articleData.autoSave = autoSave;
 
@@ -178,29 +185,35 @@ async function seed() {
   const inserted = await Article.insertMany(articles);
   console.log(`Created ${inserted.length} articles.`);
 
-  // Generate view stats for published articles
+  // Generate view statistics using the same logic as real views:
+  // each simulated view increments ViewStat.count AND Article.views together.
   console.log('Generating view statistics...');
   const publishedArticles = inserted.filter(a => a.status === 'published');
+
+  // viewTotals tracks the total view count per article so we can update Article.views at the end
+  const viewTotals = new Map(); // articleId string → total count
+
   const viewStatDocs = [];
 
-  for (const article of publishedArticles.slice(0, 100)) { // stats for first 100 published
+  for (const article of publishedArticles.slice(0, 100)) {
     const daysBack = 30;
     for (let d = daysBack; d >= 0; d--) {
-      for (let h = 0; h < 24; h += 3) { // every 3 hours
+      for (let h = 0; h < 24; h += 3) {
         const hour = new Date(Date.now() - d * 24 * 3600 * 1000);
         hour.setHours(h, 0, 0, 0);
         if (hour > article.publishedAt) {
-          // More views around mid-day, less at night
           const timeBoost = (h >= 8 && h <= 20) ? 3 : 1;
           const freshBoost = d < 3 ? 5 : (d < 7 ? 3 : 1);
           const count = randInt(0, 50) * timeBoost * freshBoost;
           if (count > 0) {
             viewStatDocs.push({ article: article._id, hour, count, publishEvents: [] });
+            const key = article._id.toString();
+            viewTotals.set(key, (viewTotals.get(key) || 0) + count);
           }
         }
       }
     }
-    // Record publish events
+    // Record publish event in the correct hour bucket
     const pubHour = new Date(article.publishedAt);
     pubHour.setMinutes(0, 0, 0);
     const existingDoc = viewStatDocs.find(
@@ -210,7 +223,10 @@ async function seed() {
     if (existingDoc) {
       existingDoc.publishEvents.push(article.publishedAt);
     } else {
-      viewStatDocs.push({ article: article._id, hour: pubHour, count: randInt(5, 30), publishEvents: [article.publishedAt] });
+      const count = randInt(5, 30);
+      viewStatDocs.push({ article: article._id, hour: pubHour, count, publishEvents: [article.publishedAt] });
+      const key = article._id.toString();
+      viewTotals.set(key, (viewTotals.get(key) || 0) + count);
     }
   }
 
@@ -219,6 +235,18 @@ async function seed() {
     await ViewStat.insertMany(viewStatDocs.slice(i, i + 500));
   }
   console.log(`Created ${viewStatDocs.length} view stat records.`);
+
+  // Update each article's views counter to exactly match the ViewStat total
+  // This makes article.views and the analytics chart always consistent
+  console.log('Syncing article view counts with ViewStat totals...');
+  const viewUpdateOps = [];
+  for (const [articleId, total] of viewTotals) {
+    viewUpdateOps.push({
+      updateOne: { filter: { _id: articleId }, update: { $set: { views: total } } },
+    });
+  }
+  if (viewUpdateOps.length) await Article.bulkWrite(viewUpdateOps);
+  console.log(`Updated view counts for ${viewUpdateOps.length} articles.`);
 
   // Create comments on published articles
   console.log('Creating comments...');
@@ -241,7 +269,8 @@ async function seed() {
   console.log('\n✅ Seed complete!');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('Login credentials:');
-  console.log('  Editor:    username=editor1     password=editor123');
+  console.log('  Editor1:   username=editor1     password=editor123');
+  console.log('  Editor2:   username=editor2     password=editor123');
   console.log('  Reporter1: username=reporter1   password=reporter123');
   console.log('  Reporter2: username=reporter2   password=reporter123');
   console.log('  Reporter3: username=reporter3   password=reporter123');

@@ -18,7 +18,10 @@
 <div class="review-page">
   <div class="dashboard-header">
     <h1>Article Review</h1>
-    <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
+    <div style="display:flex;gap:0.5rem">
+      <a href="/editor/articles/<%= article._id %>/edit" class="btn btn-outline">Edit Article</a>
+      <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
+    </div>
   </div>
 
   <% if (hasUpdate) { %>

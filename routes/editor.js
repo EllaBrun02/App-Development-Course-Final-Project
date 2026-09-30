@@ -7,6 +7,7 @@ const isEditor = requireRole('editor');
 
 router.get('/', isEditor, ec.getDashboard);
 router.get('/articles/:id', isEditor, ec.getArticleReview);
+router.get('/articles/:id/edit', isEditor, ec.getEditArticle);
 router.patch('/articles/:id', isEditor, ec.editArticle);
 router.patch('/articles/:id/publish', isEditor, ec.publishArticle);
 router.patch('/articles/:id/approve-update', isEditor, ec.approveUpdate);
