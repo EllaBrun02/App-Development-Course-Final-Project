@@ -13,7 +13,7 @@
     <div>
       <h1>Analytics</h1>
       <h2 class="analytics-article-title"><%= article.title %></h2>
-      <p class="analytics-meta">By <%= article.author ? article.author.name : '—' %> &bull; <span class="badge"><%= article.category %></span> &bull; Total views: <strong><%= article.views %></strong></p>
+      <p class="analytics-meta">By <%= article.author ? article.author.name : '—' %> &bull; <span class="badge"><%= article.category %></span> &bull; Total views: <strong id="total-views-stat"><%= article.views %></strong></p>
     </div>
     <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
   </div>

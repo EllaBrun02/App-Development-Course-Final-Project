@@ -1,7 +1,16 @@
 <%
   pageTitle = article.title;
   extraHead = '<link rel="stylesheet" href="/css/article.css">';
-  extraScripts = '<script src="/js/article.js"></script>';
+  extraScripts = `<script>
+    (function() {
+      var id = ${JSON.stringify(article._id.toString())};
+      try {
+        var ids = JSON.parse(localStorage.getItem('viewedArticleIds') || '[]');
+        if (!ids.includes(id)) { ids.push(id); localStorage.setItem('viewedArticleIds', JSON.stringify(ids)); }
+      } catch(e) {}
+    })();
+  </script>
+  <script src="/js/article.js"></script>`;
 %>
 <%- include('partials/header') %>
 

@@ -20,12 +20,20 @@
   const viewedFilter = document.getElementById('viewed-filter');
   const sortSelect = document.getElementById('sort-select');
 
+  function getLocalViewedIds() {
+    try { return JSON.parse(localStorage.getItem('viewedArticleIds') || '[]'); } catch (e) { return []; }
+  }
+
   function buildUrl() {
     const params = new URLSearchParams();
     params.set('page', page);
     if (currentSearch) params.set('search', currentSearch);
     if (currentCategory) params.set('category', currentCategory);
-    if (currentViewed) params.set('viewed', currentViewed);
+    if (currentViewed) {
+      params.set('viewed', currentViewed);
+      const ids = getLocalViewedIds();
+      if (ids.length) params.set('viewedIds', ids.join(','));
+    }
     if (currentSort !== 'date') params.set('sort', currentSort);
     return '/api/articles?' + params.toString();
   }

@@ -37,8 +37,10 @@ exports.getArticles = async (req, res) => {
       query.category = category;
     }
 
-    // viewed/not-viewed filter uses session-stored set of viewed article IDs
-    const viewedIds = req.session.viewedArticles || [];
+    // viewed/not-viewed filter — client sends localStorage IDs as comma-separated viewedIds param
+    const clientIds = (req.query.viewedIds || '').split(',').filter(Boolean);
+    const sessionIds = req.session.viewedArticles || [];
+    const viewedIds = clientIds.length ? clientIds : sessionIds;
     if (viewed === 'viewed') {
       query._id = { $in: viewedIds };
     } else if (viewed === 'unviewed') {

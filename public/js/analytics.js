@@ -4,6 +4,7 @@
   const ARTICLE_ID = window.ARTICLE_ID;
   const chartLoading = document.getElementById('chart-loading');
   const timeRangeSelect = document.getElementById('time-range');
+  const totalViewsStat = document.getElementById('total-views-stat');
   let chart = null;
 
   function getHoursAgo(range) {
@@ -24,9 +25,19 @@
       const hoursAgo = getHoursAgo(range);
       const cutoff = hoursAgo ? new Date(Date.now() - hoursAgo * 3600 * 1000) : null;
 
+      // Update total views to match chart data (all-time sum from ViewStat records)
+      const allTimeTotal = stats.reduce((sum, s) => sum + (s.count || 0), 0);
+      if (totalViewsStat) totalViewsStat.textContent = allTimeTotal;
+
       const filtered = cutoff
         ? stats.filter(s => new Date(s.hour) >= cutoff)
         : stats;
+
+      if (filtered.length === 0) {
+        chartLoading.textContent = 'No view data for the selected time range.';
+        if (chart) { chart.destroy(); chart = null; }
+        return;
+      }
 
       const labels = filtered.map(s => {
         const d = new Date(s.hour);
