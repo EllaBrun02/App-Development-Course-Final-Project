@@ -37,14 +37,11 @@ exports.getArticles = async (req, res) => {
       query.category = category;
     }
 
-    // viewed/not-viewed filter — client sends localStorage IDs as comma-separated viewedIds param
-    const clientIds = (req.query.viewedIds || '').split(',').filter(Boolean);
-    const sessionIds = req.session.viewedArticles || [];
-    const viewedIds = clientIds.length ? clientIds : sessionIds;
+    // viewed/not-viewed filter: based on the article's real view count
     if (viewed === 'viewed') {
-      query._id = { $in: viewedIds };
+      query.views = { $gt: 0 };
     } else if (viewed === 'unviewed') {
-      query._id = { $nin: viewedIds };
+      query.views = 0;
     }
 
     const sortOption = sort === 'popularity' ? { views: -1 } : { publishedAt: -1 };

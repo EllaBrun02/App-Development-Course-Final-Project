@@ -45,17 +45,36 @@ exports.getArticleReview = async (req, res) => {
   }
 };
 
+exports.getEditArticle = async (req, res) => {
+  try {
+    const article = await Article.findById(req.params.id).populate('author', 'name');
+    if (!article) return res.status(404).render('error', { message: 'Not found', code: 404 });
+    res.render('editor/article-edit', {
+      article,
+      categories: Article.CATEGORIES,
+      user: req.session.userName,
+      userRole: req.session.userRole,
+    });
+  } catch (err) {
+    logger.error(`Editor get edit error: ${err.message}`);
+    res.status(500).render('error', { message: 'Server error', code: 500 });
+  }
+};
+
 // Editor edits article content directly
 exports.editArticle = async (req, res) => {
   try {
-    const { title, content, summary, image } = req.body;
+    const { title, content, summary, image, category } = req.body;
     const article = await Article.findById(req.params.id);
     if (!article) return res.status(404).json({ error: 'Not found' });
+    if (!title || !content || !summary) return res.status(400).json({ error: 'Title, summary and content are required.' });
     article.title = title;
     article.content = content;
     article.summary = summary;
     article.image = image || '';
+    if (category && Article.CATEGORIES.includes(category)) article.category = category;
     await article.save();
+    logger.info(`Article ${article._id} edited by editor ${req.session.userId}`);
     res.json({ ok: true });
   } catch (err) {
     logger.error(`Editor edit error: ${err.message}`);
