@@ -40,10 +40,13 @@ function getDeviceId(req, res) {
     const dot = raw.lastIndexOf('.');
     if (dot > 0) {
       const id = raw.slice(0, dot);
-      const sig = raw.slice(dot + 1);
-      const expected = sign(id);
-      if (sig.length === expected.length &&
-          crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
+      const sigBuf = Buffer.from(raw.slice(dot + 1));
+      const expectedBuf = Buffer.from(sign(id));
+      // Compare BYTE lengths before timingSafeEqual: a multibyte character in
+      // a tampered cookie passes a string-length check but makes the buffers
+      // differ in size, and timingSafeEqual throws on unequal buffers.
+      if (sigBuf.length === expectedBuf.length &&
+          crypto.timingSafeEqual(sigBuf, expectedBuf)) {
         return id;
       }
     }

@@ -26,7 +26,16 @@ function makeJar() {
       return [...cookies.entries()].map(([k, v]) => `${k}=${v}`).join('; ');
     },
     absorb(res) {
-      const set = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
+      // getSetCookie exists from Node 18.14; older 18.x joins all Set-Cookie
+      // headers with commas, so fall back to splitting on a comma that starts
+      // a new `name=` pair (commas inside Expires dates are not followed by =).
+      let set;
+      if (res.headers.getSetCookie) {
+        set = res.headers.getSetCookie();
+      } else {
+        const raw = res.headers.get('set-cookie');
+        set = raw ? raw.split(/,(?=\s*[^;,\s]+=)/) : [];
+      }
       for (const line of set) {
         const [pair] = line.split(';');
         const eq = pair.indexOf('=');
