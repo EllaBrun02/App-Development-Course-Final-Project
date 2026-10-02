@@ -21,11 +21,11 @@ Some functional findings were also present in `dev`; they were fixed here becaus
 
 ## Verification
 
-- `npm test`: **13 passing tests**, using real HTTP, login sessions, EJS rendering and a unique disposable MongoDB database. The analytics tests execute the real client script with controlled network and canvas boundaries. The tests reproduced the failures before the fixes.
+- Local verification: **13 passing checks**, using real HTTP, login sessions, EJS rendering and a unique disposable MongoDB database. The analytics checks execute the real client script with controlled network and canvas boundaries. These scripts are maintained outside the repository and are not part of the submission.
 - Browser: home, editor dashboard, review, edit and analytics at **320, 390, 768, 1024 and 1440px**; no document-level horizontal overflow. Reporter dashboard and new-article form also passed at 320, 768 and 1440px. Wide tables keep their own horizontal scrolling.
 - Browser: pending-update save, inert script text, category filtering, public image fallback and analytics range switching. The test account included an 80-character unbroken name.
 - JavaScript syntax, EJS compilation and `git diff --check` passed.
 
-Start MongoDB on `127.0.0.1:27017`, install this checkout's dependencies, then run `npm test` from the repository root. Tests remove only their own generated database. Native dependencies must match the local platform; this Mac's run used the existing native bcrypt build via a temporary preload, without changing tracked `node_modules`.
+The local checks use MongoDB on `127.0.0.1:27017` and remove only their own generated database. Native dependencies must match the local platform; this Mac's run used the existing native bcrypt build via a temporary preload, without changing tracked `node_modules`. No test command or new testing dependency is included in this PR.
 
 The browser fixture used separate disposable data and fixed weather responses. Live weather availability, a full load test and every older audit issue were outside this review. The legacy `tests/stress-test.js` was not run: it hardcodes port 3000 and expects seeded data. Runtime logs are excluded from the fix commit.
