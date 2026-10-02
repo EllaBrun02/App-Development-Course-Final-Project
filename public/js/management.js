@@ -6,7 +6,10 @@
     message = document.getElementById("management-message");
   let page = 1,
     id = null,
-    request = 0;
+    request = 0,
+    busy = false,
+    loading = false,
+    hasMore = false;
   const definitions = {
     users: [
       ["username", "Username", "text"],
@@ -25,6 +28,15 @@
       ["count", "Views", "number"],
     ],
   };
+  function syncControls() {
+    const controls = [resource, document.getElementById("new-record"),
+      ...form.querySelectorAll("input, select, textarea, button"),
+      ...document.getElementById("search-form").querySelectorAll("input, button"),
+      ...list.querySelectorAll("button")];
+    controls.forEach(control => { control.disabled = busy; });
+    document.getElementById("previous").disabled = busy || loading || page === 1;
+    document.getElementById("next").disabled = busy || loading || !hasMore;
+  }
   async function api(path = "", method = "GET", body) {
     const r = await fetch("/editor/api/" + resource.value + path, {
       method,
@@ -82,6 +94,9 @@
   }
   async function load() {
     const token = ++request;
+    loading = true;
+    list.replaceChildren();
+    syncControls();
     try {
       const data = await api(
         "?page=" +
@@ -108,28 +123,39 @@
         remove.textContent = "Delete";
         remove.className = "btn btn-sm btn-danger";
         remove.addEventListener("click", async () => {
-          if (!confirm("Delete this record?")) return;
+          if (busy || !confirm("Delete this record?")) return;
+          busy = true;
+          syncControls();
           try {
             await api("/" + item._id, "DELETE");
             if (id === item._id) edit();
             await load();
           } catch (e) {
             message.textContent = e.message;
+          } finally {
+            busy = false;
+            syncControls();
           }
         });
         li.append(text, " ", change, " ", remove);
         list.appendChild(li);
       }
-      document.getElementById("previous").disabled = page === 1;
-      document.getElementById("next").disabled = !data.hasMore;
+      hasMore = data.hasMore;
     } catch (e) {
-      message.textContent = e.message;
+      if (token === request) {
+        hasMore = false;
+        message.textContent = e.message;
+      }
+    } finally {
+      if (token === request) {
+        loading = false;
+        syncControls();
+      }
     }
   }
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const button = form.querySelector("button");
-    button.disabled = true;
+    if (busy) return;
     try {
       const body = Object.fromEntries(new FormData(form));
       if (id && !body.password) delete body.password;
@@ -137,6 +163,8 @@
         body.count = Number(body.count);
         body.hour = new Date(body.hour + "Z").toISOString();
       }
+      busy = true;
+      syncControls();
       await api(id ? "/" + id : "", id ? "PATCH" : "POST", body);
       message.textContent = "Saved";
       edit();
@@ -144,10 +172,12 @@
     } catch (e) {
       message.textContent = e.message;
     } finally {
-      button.disabled = false;
+      busy = false;
+      syncControls();
     }
   });
   resource.addEventListener("change", () => {
+    if (busy) return;
     page = 1;
     document.getElementById("search").value = "";
     message.textContent = "";
@@ -156,18 +186,21 @@
   });
   document.getElementById("search-form").addEventListener("submit", (e) => {
     e.preventDefault();
+    if (busy) return;
     page = 1;
     load();
   });
   document.getElementById("previous").addEventListener("click", () => {
+    if (busy || loading || page === 1) return;
     page--;
     load();
   });
   document.getElementById("next").addEventListener("click", () => {
+    if (busy || loading || !hasMore) return;
     page++;
     load();
   });
-  document.getElementById("new-record").addEventListener("click", () => edit());
+  document.getElementById("new-record").addEventListener("click", () => { if (!busy) edit(); });
   edit();
   load();
 })();

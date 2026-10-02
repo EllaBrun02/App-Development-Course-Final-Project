@@ -1,7 +1,18 @@
 <div class="weather-widget">
   <h3 class="widget-title">Weather</h3>
   <div class="weather-inner">
-    <span class="weather-icon"><%= weather.icon %></span>
+    <span class="weather-icon" aria-hidden="true">
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <% if (/clear/i.test(weather.description)) { %>
+        <circle cx="24" cy="24" r="9"/><path d="M24 3v6m0 30v6M3 24h6m30 0h6M9 9l4 4m22 22 4 4M9 39l4-4m22-22 4-4"/>
+      <% } else if (/snow/i.test(weather.description)) { %>
+        <path d="M24 4v40M7 14l34 20M7 34l34-20M19 8l5 5 5-5M19 40l5-5 5 5"/>
+      <% } else { %>
+        <path d="M12 32a8 8 0 0 1-1-16 12 12 0 0 1 23-1 9 9 0 0 1 2 17Z"/>
+        <% if (/rain|drizzle|shower|thunder/i.test(weather.description)) { %><path d="m16 38-2 5m12-5-2 5m12-5-2 5"/><% } %>
+      <% } %>
+      </svg>
+    </span>
     <div class="weather-info">
       <div class="weather-city"><%= weather.city %></div>
       <div class="weather-temp"><%= weather.temp %>°C</div>

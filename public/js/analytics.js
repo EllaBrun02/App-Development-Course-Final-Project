@@ -4,7 +4,10 @@
   const ARTICLE_ID = window.ARTICLE_ID;
   const chartLoading = document.getElementById('chart-loading');
   const timeRangeSelect = document.getElementById('time-range');
+  const totalViewsStat = document.getElementById('total-views-stat');
   let chart = null;
+  let requestId = 0;
+  let activeRequest = null;
 
   function getHoursAgo(range) {
     if (range === '24h') return 24;
@@ -14,19 +17,34 @@
   }
 
   async function loadAndRender() {
+    const id = ++requestId;
+    if (activeRequest) activeRequest.abort();
+    activeRequest = new AbortController();
+    const range = timeRangeSelect.value;
+    chartLoading.textContent = 'Loading chart data…';
     chartLoading.classList.remove('hidden');
     try {
-      const res = await fetch(`/editor/api/analytics/${ARTICLE_ID}`);
+      const res = await fetch(`/editor/api/analytics/${ARTICLE_ID}`, { signal: activeRequest.signal });
       if (!res.ok) throw new Error('Failed to load analytics');
       const { stats } = await res.json();
 
-      const range = timeRangeSelect.value;
+      if (id !== requestId) return;
       const hoursAgo = getHoursAgo(range);
       const cutoff = hoursAgo ? new Date(Date.now() - hoursAgo * 3600 * 1000) : null;
+
+      // Update total views to match chart data (all-time sum from ViewStat records)
+      const allTimeTotal = stats.reduce((sum, s) => sum + (s.count || 0), 0);
+      if (totalViewsStat) totalViewsStat.textContent = allTimeTotal;
 
       const filtered = cutoff
         ? stats.filter(s => new Date(s.hour) >= cutoff)
         : stats;
+
+      if (filtered.length === 0) {
+        chartLoading.textContent = 'No view data for the selected time range.';
+        if (chart) { chart.destroy(); chart = null; }
+        return;
+      }
 
       const labels = filtered.map(s => {
         const d = new Date(s.hour);
@@ -42,50 +60,53 @@
         }
       });
 
-      // Build vertical-line annotations for publish events
-      const annotations = {};
-      publishPoints.forEach((p, i) => {
-        annotations[`pub_${i}`] = {
-          type: 'line',
-          xMin: p.idx,
-          xMax: p.idx,
-          borderColor: '#E74C3C',
-          borderWidth: 2,
-          borderDash: [4, 4],
-          label: {
-            content: '📢 Published',
-            enabled: true,
-            position: 'start',
-            backgroundColor: '#E74C3C',
-            color: '#fff',
-            font: { size: 11, family: 'Arial' },
-          },
-        };
-      });
-
       if (chart) chart.destroy();
+
+      // Draw publish event lines manually as chartjs plugin
+      const publishPlugin = {
+        id: 'publishLines',
+        afterDraw(chart) {
+          const ctx = chart.ctx;
+          publishPoints.forEach(p => {
+            const x = chart.scales.x.getPixelForValue(p.idx);
+            const topY = chart.scales.y.top;
+            const bottomY = chart.scales.y.bottom;
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = '#b45b3d';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, topY);
+            ctx.lineTo(x, bottomY);
+            ctx.stroke();
+            ctx.restore();
+          });
+        },
+      };
 
       const ctx = document.getElementById('views-chart').getContext('2d');
       chart = new Chart(ctx, {
         type: 'line',
+        plugins: [publishPlugin],
         data: {
           labels,
           datasets: [{
             label: 'Views per hour',
             data: counts,
-            borderColor: '#4A90D9',
-            backgroundColor: 'rgba(74,144,217,0.12)',
+            borderColor: '#6535b5',
+            backgroundColor: 'rgba(101,53,181,0.1)',
             fill: true,
             tension: 0.3,
             pointRadius: counts.map((_, i) => publishPoints.some(p => p.idx === i) ? 6 : 2),
             pointBackgroundColor: counts.map((_, i) =>
-              publishPoints.some(p => p.idx === i) ? '#E74C3C' : '#4A90D9'
+              publishPoints.some(p => p.idx === i) ? '#b45b3d' : '#6535b5'
             ),
           }],
         },
         options: {
+          animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : undefined,
           responsive: true,
-          maintainAspectRatio: true,
+          maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -121,31 +142,10 @@
         },
       });
 
-      // Draw publish event lines manually as chartjs plugin
-      const publishPlugin = {
-        id: 'publishLines',
-        afterDraw(chart) {
-          const ctx = chart.ctx;
-          publishPoints.forEach(p => {
-            const x = chart.scales.x.getPixelForValue(p.idx);
-            const topY = chart.scales.y.top;
-            const bottomY = chart.scales.y.bottom;
-            ctx.save();
-            ctx.setLineDash([4, 4]);
-            ctx.strokeStyle = '#E74C3C';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(x, topY);
-            ctx.lineTo(x, bottomY);
-            ctx.stroke();
-            ctx.restore();
-          });
-        },
-      };
-      Chart.register(publishPlugin);
-
       chartLoading.classList.add('hidden');
     } catch (err) {
+      if (id !== requestId || err.name === 'AbortError') return;
+      if (chart) { chart.destroy(); chart = null; }
       chartLoading.textContent = 'Failed to load analytics data.';
     }
   }

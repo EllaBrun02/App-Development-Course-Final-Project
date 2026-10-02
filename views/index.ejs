@@ -6,48 +6,55 @@
 %>
 <%- include('partials/header', { pageTitle, extraHead }) %>
 
-<div class="content-with-sidebar">
+<section class="edition-heading" aria-labelledby="edition-title">
+  <div class="edition-intro"><h1 id="edition-title">Today’s edition.</h1>
+  <p class="edition-description">World news. New ideas. Different perspectives.</p></div>
+  <div class="edition-details"><p class="edition-date"><%= new Date().toLocaleDateString('en-US', { weekday: 'long' }) %><br><strong><%= new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) %></strong></p>
+  <a href="#latest-news" class="edition-link">Start reading <span aria-hidden="true">↓</span></a></div>
+</section>
+<div class="content-with-sidebar home-layout">
   <main class="main-content">
-    <div class="feed-toolbar">
+    <div class="feed-heading" id="latest-news"><h2>Latest stories</h2><span class="live-label">Fresh from the newsroom</span></div>
+    <div class="feed-toolbar" role="search" aria-label="Find articles">
       <div class="search-row">
-        <input id="search-input" type="text" placeholder="Search articles..." class="search-input" />
+        <input id="search-input" type="search" aria-label="Search articles" placeholder="Find a story, topic, or headline…" class="search-input" />
         <button id="search-btn" class="btn btn-primary">Search</button>
       </div>
       <div class="filters-row">
-        <select id="category-filter" class="filter-select">
+        <select aria-label="Filter by category" id="category-filter" class="filter-select">
           <option value="">All Categories</option>
           <% categories.forEach(cat => { %>
             <option value="<%= cat %>"><%= cat %></option>
           <% }); %>
         </select>
-        <select id="viewed-filter" class="filter-select">
+        <select aria-label="Filter by reading history" id="viewed-filter" class="filter-select">
           <option value="">All Articles</option>
           <option value="viewed">Viewed</option>
           <option value="unviewed">Not Viewed</option>
         </select>
-        <select id="sort-select" class="filter-select">
+        <select aria-label="Sort articles" id="sort-select" class="filter-select">
           <option value="date">Newest First</option>
           <option value="popularity">Most Popular</option>
         </select>
       </div>
     </div>
 
-    <div id="articles-feed" class="articles-feed">
-      <div class="loading-spinner" id="initial-spinner">Loading articles...</div>
-    </div>
+    <div class="loading-spinner hidden" id="initial-spinner" role="status">Loading stories…</div>
+    <div id="articles-feed" class="articles-feed" aria-busy="true"></div>
+    <p id="feed-status" class="sr-only" role="status"></p>
 
     <div id="load-more-trigger" class="load-more-trigger"></div>
-    <div id="loading-more" class="loading-more hidden">Loading more articles...</div>
-    <div id="no-more" class="no-more hidden">No more articles</div>
+    <div id="loading-more" class="loading-more hidden" role="status">Loading more articles...</div>
+    <div id="no-more" class="no-more hidden" role="status">You’re all caught up.</div>
   </main>
 
   <aside class="sidebar">
     <%- include('partials/weather') %>
     <div class="categories-widget">
-      <h3 class="widget-title">Categories</h3>
+      <h3 class="widget-title">Explore topics</h3>
       <ul class="categories-list">
         <% categories.forEach(cat => { %>
-          <li><a href="#" class="category-link" data-category="<%= cat %>"><%= cat %></a></li>
+          <li><a href="#latest-news" class="category-link" data-category="<%= cat %>"><%= cat %><span aria-hidden="true">↗</span></a></li>
         <% }); %>
       </ul>
     </div>

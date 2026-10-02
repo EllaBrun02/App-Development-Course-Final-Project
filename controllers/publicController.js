@@ -43,7 +43,7 @@ exports.getArticles = async (req, res) => {
       query.category = category;
     }
 
-    // viewed/not-viewed filter uses session-stored set of viewed article IDs
+    // Reading history belongs to the current visitor, not all site readers.
     const viewedIds = req.session.viewedArticles || [];
     if (viewed === 'viewed') {
       query._id = { $in: viewedIds };

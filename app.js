@@ -22,8 +22,15 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Body parsing
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Allow the validated 100,000-character body, including multi-byte UTF-8 text.
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+app.use((req, res, next) => {
+  if (req.body !== undefined && (req.body === null || typeof req.body !== 'object' || Array.isArray(req.body))) {
+    return res.status(400).json({ error: 'Request body must be an object.' });
+  }
+  next();
+});
 
 // Cookie parser (minimal - read cookies for device ID)
 app.use((req, res, next) => {

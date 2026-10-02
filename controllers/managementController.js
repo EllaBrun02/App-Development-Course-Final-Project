@@ -77,7 +77,7 @@ async function fields(req, existing) {
           date = new Date(raw);
         if (!Number.isFinite(date.getTime()) || date > new Date())
           v.bad("Invalid hour");
-        date.setMinutes(0, 0, 0);
+        date.setUTCMinutes(0, 0, 0);
         out.hour = date;
       }
       if (creating || body.count !== undefined) {
@@ -98,6 +98,10 @@ async function fields(req, existing) {
           return d;
         });
       }
+      const hour = out.hour || existing?.hour;
+      const events = out.publishEvents || existing?.publishEvents || [];
+      if (events.some(event => event < hour || event.getTime() >= hour.getTime() + 3600000))
+        v.bad("Each publication event must belong to this record's hour");
     }
   }
   return out;

@@ -75,12 +75,14 @@ exports.getArticleReview = async (req, res) => {
 // Explicit version target prevents editing live content while reviewing an update.
 exports.getEditArticle = async (req, res) => {
   try {
-    const article = await Article.findById(req.params.id);
+    const article = await Article.findById(req.params.id).populate('author', 'name');
     if (!article) v.bad("Not found", 404);
     const target =
       req.query.target ||
       (article.pendingUpdate?.status === "pending" ? "update" : "main");
     if (!["main", "update"].includes(target)) v.bad("Invalid target");
+    if (target === "main" && article.status === "published")
+      v.bad("Published content must be changed through a pending update", 409);
     if (
       target === "update" &&
       !(
@@ -91,8 +93,8 @@ exports.getEditArticle = async (req, res) => {
       v.bad("No pending update", 409);
     res.render("editor/article-edit", {
       article,
-      target,
-      editableContent: target === "update" ? article.pendingUpdate : article,
+      editTarget: target,
+      categories: Article.CATEGORIES,
       user: req.session.userName,
       userRole: req.session.userRole,
     });
@@ -108,12 +110,16 @@ exports.editArticle = async (req, res) => {
     const target = req.body.target;
     if (!["main", "update"].includes(target))
       v.bad("Choose the version to edit");
+    if (req.body.category !== undefined && !Article.CATEGORIES.includes(req.body.category))
+      v.bad("Invalid category");
     if (target === "update") {
       if (
         article.status !== "published" ||
         article.pendingUpdate?.status !== "pending"
       )
         v.bad("No pending update", 409);
+      if (req.body.category !== undefined && req.body.category !== article.category)
+        v.bad("Category cannot change while editing a pending update");
       Object.assign(article.pendingUpdate, v.content(req.body, true));
       article.pendingUpdate.autoSave = undefined;
     } else {
@@ -123,6 +129,7 @@ exports.editArticle = async (req, res) => {
           409,
         );
       Object.assign(article, v.content(req.body, article.status !== "draft"));
+      if (req.body.category !== undefined) article.category = req.body.category;
       article.autoSave = undefined;
     }
     await article.save();
@@ -235,7 +242,8 @@ exports.returnArticle = async (req, res) => {
 // Delete article
 exports.deleteArticle = async (req, res) => {
   try {
-    await Article.findByIdAndDelete(req.params.id);
+    const deleted = await Article.findByIdAndDelete(req.params.id);
+    if (!deleted) v.bad("Not found", 404);
     logger.info(
       `Article ${req.params.id} deleted by editor ${req.session.userId}`,
     );

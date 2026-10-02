@@ -3,7 +3,34 @@
 
   const ARTICLE_ID = window.ARTICLE_ID;
   const HAS_UPDATE = window.HAS_UPDATE;
-  const ARTICLE_STATUS = window.ARTICLE_STATUS;
+
+  // ── Diff rendering ────────────────────────────────────────────────────────
+  if (HAS_UPDATE && window.Diff) {
+    function renderDiff(oldText, newText, oldEl, newEl) {
+      const parts = Diff.diffWords(oldText || '', newText || '');
+      let oldHtml = '', newHtml = '';
+      parts.forEach(function(p) {
+        const safe = p.value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        if (p.removed) {
+          oldHtml += '<del class="diff-del">' + safe + '</del>';
+        } else if (p.added) {
+          newHtml += '<ins class="diff-add">' + safe + '</ins>';
+        } else {
+          oldHtml += safe;
+          newHtml += safe;
+        }
+      });
+      oldEl.innerHTML = oldHtml;
+      newEl.innerHTML = newHtml;
+    }
+
+    // Read escaped server-rendered text; article content never enters a script tag.
+    ['title', 'summary', 'content'].forEach(field => {
+      const oldEl = document.getElementById(`diff-${field}-old`);
+      const newEl = document.getElementById(`diff-${field}-new`);
+      renderDiff(oldEl.textContent, newEl.textContent, oldEl, newEl);
+    });
+  }
 
   const actionMsg = document.getElementById('action-message');
   const returnForm = document.getElementById('return-form');
@@ -13,7 +40,7 @@
     actionMsg.textContent = text;
     actionMsg.className = 'action-message ' + type;
     actionMsg.classList.remove('hidden');
-    actionMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    actionMsg.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   }
 
   async function apiPatch(url, body) {

@@ -25,7 +25,7 @@
 
       <% if (article.image) { %>
         <figure class="article-hero">
-          <img src="<%= article.image %>" alt="<%= article.title %>" loading="lazy" />
+          <img src="<%= article.image %>" alt="<%= article.title %>" data-image-fallback />
         </figure>
       <% } %>
 
@@ -33,9 +33,7 @@
         <p><%= article.summary %></p>
       </div>
 
-      <div class="article-body" style="white-space: pre-wrap" itemprop="articleBody">
-        <%= article.content %>
-      </div>
+      <div class="article-body" itemprop="articleBody"><%= article.content %></div>
     </article>
 
     <section class="comments-section" id="comments">

@@ -49,6 +49,7 @@
       } catch {}
     }
     message(dirty ? "Changes not saved yet" : "Saved to server");
+    error.classList.add("hidden");
   }
   // A local recovery copy protects the last keystrokes; acknowledged work lives on the server.
   try {
@@ -118,11 +119,19 @@
   }
   async function ensureId(snapshot) {
     if (id) return;
-    const result = await api(
-      "/reporter/articles",
-      { ...snapshot, draftKey },
-      "POST",
-    );
+    const category = document.getElementById("category");
+    category.disabled = true;
+    let result;
+    try {
+      result = await api(
+        "/reporter/articles",
+        { ...snapshot, draftKey },
+        "POST",
+      );
+    } catch (err) {
+      category.disabled = busy || !editable;
+      throw err;
+    }
     id = result.id;
     // Move recovery before removing its old key; retain it if navigation interrupts.
     const old = key;
@@ -239,11 +248,15 @@
       )
         return;
       e.preventDefault();
+      if (busy) return;
+      lock(true);
       try {
         await flush();
         window.location.href = link.href;
       } catch (err) {
         failed(err);
+      } finally {
+        lock(false);
       }
     }),
   );

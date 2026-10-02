@@ -1,9 +1,11 @@
   </div><!-- .page-wrapper -->
   <footer class="site-footer">
     <div class="footer-inner">
-      <p>&copy; 2024 The Daily Web &mdash; All rights reserved.</p>
+      <a class="footer-brand" href="/">The Daily Web<span>News. Context. Perspective.</span></a>
+      <p>&copy; <%= new Date().getFullYear() %> The Daily Web. All rights reserved.</p>
     </div>
   </footer>
+  <script src="/js/image-fallback.js"></script>
   <% if (typeof extraScripts !== 'undefined') { %><%- extraScripts %><% } %>
 </body>
 </html>

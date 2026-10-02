@@ -1,11 +1,11 @@
 # Audit findings 1–18
 
-This branch starts at main (e76e4c3), independently of design/editorial-responsive. It implements the first 18 findings in the explanatory PDF. Findings 19–38 are not claimed as resolved.
+This PR implements findings 1–18 from the explanatory PDF and includes the responsive design already merged into `dev` (8db36cb). Findings 19–38 are outside this review; this document does not claim that the entire audit is complete.
 
 | Finding | Implementation / verification |
 | --- | --- |
 | 1 | Article body is escaped text with preserved line breaks. HTTP regression submits script-like content and checks rendered output. |
-| 2 | Main already rendered review text through escaped EJS, without embedding submitted text in a script. That safe path is retained, with a script-termination regression. This is not the Diff implementation on the design branch. |
+| 2 | Review text is server-rendered with escaped EJS. The optional Diff enhancement reads that text from the DOM; submitted text is never interpolated into executable JavaScript. Both versions and their images remain readable without Diff. |
 | 3 | New draft creation accepts partial content. Typing creates a draft automatically. A client draft key makes retried creation idempotent. |
 | 4 | Every input writes a user-scoped local recovery copy; internal navigation waits for saving. Closing warns while dirty. Page hiding attempts a keepalive save. Work is marked clean only on server acknowledgement. A last-moment network save cannot be guaranteed after a crash; the local recovery copy covers that gap on the same browser. |
 | 5 | Manual saving removes old server autosave data; the client serializes requests so older autosaves cannot finish after a manual save. |
@@ -14,7 +14,7 @@ This branch starts at main (e76e4c3), independently of design/editorial-responsi
 | 8 | Editor review links target the pending version. The server requires an explicit main/update target and validates pending-update state. Editing then approving an update is covered by regression tests. |
 | 9 | Reporter ownership and workflow guards are checked server-side. Pending submissions cannot be overwritten/autosaved. Optimistic concurrency and client revisions reject stale writes with 409. |
 | 10 | Returning either kind of submission requires a nonblank note at the server. |
-| 11 | Main already used the session's read history. Tests verify both a new session and read/unread filtering after visiting an article. |
+| 11 | The viewed filter uses the session's read history. Private checks verify a new session and read/unread filtering after visiting an article; the merge regression that used global view counts was corrected. |
 | 12 | Date and popularity sorting use descending _id as a unique tie breaker. Offset pagination remains; concurrent changes to sort values can still shift pages. |
 | 13 | Editor-only CRUD, detail/list/search APIs and a management screen for Users, Comments and ViewStat. Article creation remains reporter-owned, with editor search/read/edit/delete. Password hashes are excluded. User deletion is blocked for authors and the current editor. Roles are checked against current database records. ViewStat CRUD recalculates article totals; concurrent multi-collection consistency remains a finding 29 concern. |
 | 14 | Reporter dashboard projection includes pending update status and note. |
@@ -29,16 +29,19 @@ Use Node.js 20 or later and a running local MongoDB on port 27017. Install depen
 
 ```sh
 npm ci
-npm test
 PORT=3100 MONGO_URI=mongodb://127.0.0.1:27017/ella_daily_web npm start
 ```
 
-`npm test` creates and drops its own uniquely named `audit_test_*` database. It never seeds or drops the application database. TEST_PORT can override port 3198 if occupied. The HTTP suite uses real Express/Mongoose/MongoDB; client tests run the real autosave script in a small DOM/storage/timer harness with controlled HTTP responses.
-
-For this workstation the native bcrypt binding in upstream node_modules could not load. The test run used a temporary external module-resolution shim pointing only bcrypt to the already installed local project copy. No shim or machine-specific path is required or included in the shipped tests; `npm ci` prepares platform-native dependencies normally.
-
 ## Verification
 
-31 automated tests passed. EJS templates and JavaScript compile, and git diff --check passes. In a separate disposable database/browser session, a new draft auto-created, survived reload, the management page listed accounts, and editing a pending update changed the pending panel while leaving the published panel unchanged.
+63 private checks passed using real HTTP/Express/Mongoose/MongoDB requests and controlled client-side DOM/timer harnesses. The suite covers rendering, draft recovery and saving, ownership/state transitions, pending-version editing and approval, CRUD, input validation, pagination, and the inherited design/analytics regressions. JavaScript and EJS compilation and whitespace checks also pass.
 
-No new production framework/library was added. The two branches are intentionally independent; they both touch templates and article editing, so merging them together needs deliberate conflict resolution. In particular, do not reintroduce the design branch's raw Diff payload script into the escaped review implementation.
+Browser checks used a separate disposable database and confirmed:
+- A new Hebrew draft auto-created without a Save click and retained its contents after reload.
+- Editing a pending update changed only the pending panel; the published panel stayed unchanged.
+- Script-like article text remained visible text and did not execute.
+- The management screen saved an edited comment and fit widths of 320, 390, 768, 1024 and 1440 pixels, including a 900-character unbroken comment. Reporter/edit/review layouts were also checked at mobile/tablet widths.
+
+At the project owner's request, verification scripts live outside the Git repository. The two audit test files and the npm test command have been removed from this PR. Existing test assets inherited from dev are unchanged. Test runs used uniquely named disposable databases and did not seed or modify the application database. A temporary local bcrypt resolution shim was used for this workstation's native binding; no shim or machine-specific runtime path is part of the PR.
+
+No production framework or library was added. Last-moment browser/network failures still require local recovery on the same browser; only server-acknowledged work is available on another computer. Offset pagination can shift when new articles arrive, and multi-collection transaction consistency remains outside findings 1–18.
