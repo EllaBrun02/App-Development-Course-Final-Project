@@ -77,10 +77,10 @@ exports.getArticlePage = async (req, res) => {
       .populate('author', 'name');
     if (!article) return res.status(404).render('error', { message: 'Article not found', code: 404 });
 
-    // Record view
-    await recordView(article._id);
-    article.views += 1;
-    await Article.updateOne({ _id: article._id }, { $inc: { views: 1 } });
+    // Record view (audit #29: keep the article counter and the per-hour
+    // stats consistent — compensate if only one of the two writes succeeds)
+    const recorded = await recordView(article._id);
+    if (recorded) article.views += 1;
 
     // Track in session for viewed/unviewed filter
     if (!req.session.viewedArticles) req.session.viewedArticles = [];
@@ -106,6 +106,10 @@ exports.getArticlePage = async (req, res) => {
   }
 };
 
+// Audit #29: the two related writes (hourly bucket + total counter) are not
+// atomic in MongoDB without transactions. We order them and compensate: the
+// bucket is incremented first; if the total-counter update then fails, the
+// bucket increment is rolled back so the two numbers stay consistent.
 async function recordView(articleId) {
   const now = new Date();
   const hour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
@@ -117,5 +121,29 @@ async function recordView(articleId) {
     );
   } catch (err) {
     logger.error(`ViewStat update error: ${err.message}`);
+    return false; // stats not recorded — don't bump the total counter either
+  }
+  try {
+    await Article.updateOne({ _id: articleId }, { $inc: { views: 1 } });
+    return true;
+  } catch (err) {
+    logger.error(`Article views counter update error: ${err.message} — rolling back stat increment`);
+    try {
+      await ViewStat.updateOne({ article: articleId, hour }, { $inc: { count: -1 } });
+    } catch (rollbackErr) {
+      logger.error(`ViewStat rollback failed (data may be inconsistent): ${rollbackErr.message}`);
+    }
+    return false;
   }
 }
+
+// API endpoint so an open page can refresh the weather widget (audit #26)
+exports.getWeatherData = async (req, res) => {
+  try {
+    const weather = await getWeather();
+    res.json({ weather });
+  } catch (err) {
+    logger.error(`Weather API error: ${err.message}`);
+    res.status(500).json({ error: 'Weather unavailable' });
+  }
+};

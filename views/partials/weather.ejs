@@ -1,4 +1,4 @@
-<div class="weather-widget">
+<div class="weather-widget" id="weather-widget">
   <h3 class="widget-title">Weather</h3>
   <div class="weather-inner">
     <span class="weather-icon" aria-hidden="true">
@@ -14,11 +14,15 @@
       </svg>
     </span>
     <div class="weather-info">
-      <div class="weather-city"><%= weather.city %></div>
-      <div class="weather-temp"><%= weather.temp %>°C</div>
-      <div class="weather-desc"><%= weather.description %></div>
-      <div class="weather-wind">Wind: <%= weather.windspeed %> km/h</div>
+      <div class="weather-city" id="weather-city"><%= weather.city %></div>
+      <div class="weather-temp" id="weather-temp"><%= weather.temp %>°C</div>
+      <div class="weather-desc" id="weather-desc"><%= weather.description %></div>
+      <div class="weather-wind" id="weather-wind">Wind: <%= weather.windspeed %> km/h</div>
     </div>
   </div>
-  <div class="weather-updated">Updated: <%= weather.fetchedAt %></div>
+  <div class="weather-stale <%= weather.stale ? '' : 'hidden' %>" id="weather-stale" role="status">
+    ⚠ Weather data may be out of date
+  </div>
+  <div class="weather-updated">Updated: <span id="weather-updated"><%= weather.fetchedAt %></span></div>
 </div>
+<script src="/js/weather.js" defer></script>

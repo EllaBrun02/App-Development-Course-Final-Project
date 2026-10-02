@@ -9,11 +9,50 @@
   let requestId = 0;
   let activeRequest = null;
 
+  const HOUR_MS = 3600 * 1000;
+
   function getHoursAgo(range) {
     if (range === '24h') return 24;
     if (range === '7d') return 24 * 7;
     if (range === '30d') return 24 * 30;
     return null; // all
+  }
+
+  function truncToHour(date) {
+    const d = new Date(date);
+    d.setMinutes(0, 0, 0);
+    return d;
+  }
+
+  // Audit #22: the x axis must represent real time. We build a continuous
+  // hourly series (missing hours filled with 0 views) so equal distances on
+  // the axis always mean equal time, and quiet hours show as zero.
+  function buildHourlySeries(stats, cutoff) {
+    const byHour = new Map();
+    stats.forEach(s => {
+      byHour.set(truncToHour(s.hour).getTime(), s);
+    });
+
+    const times = [...byHour.keys()].sort((a, b) => a - b);
+    if (times.length === 0) return [];
+
+    const start = cutoff ? Math.max(times[0], truncToHour(cutoff).getTime()) : times[0];
+    const end = truncToHour(new Date()).getTime();
+
+    const series = [];
+    for (let t = start; t <= end; t += HOUR_MS) {
+      const s = byHour.get(t);
+      series.push({
+        time: t,
+        count: s ? s.count : 0,
+        publishEvents: s && s.publishEvents ? s.publishEvents : [],
+      });
+    }
+    return series;
+  }
+
+  function formatHour(t) {
+    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
   async function loadAndRender() {
@@ -23,62 +62,72 @@
     const range = timeRangeSelect.value;
     chartLoading.textContent = 'Loading chart data…';
     chartLoading.classList.remove('hidden');
+    chartLoading.textContent = 'Loading chart data...';
     try {
-      const res = await fetch(`/editor/api/analytics/${ARTICLE_ID}`, { signal: activeRequest.signal });
+      const hoursAgo = getHoursAgo(range);
+
+      // Audit #28: ask the server only for the selected range
+      const url = `/editor/api/analytics/${ARTICLE_ID}` + (hoursAgo ? `?hours=${hoursAgo}` : '');
+      const res = await fetch(url, { signal: activeRequest.signal });
       if (!res.ok) throw new Error('Failed to load analytics');
       const { stats } = await res.json();
 
       if (id !== requestId) return;
-      const hoursAgo = getHoursAgo(range);
-      const cutoff = hoursAgo ? new Date(Date.now() - hoursAgo * 3600 * 1000) : null;
+      const cutoff = hoursAgo ? new Date(Date.now() - hoursAgo * HOUR_MS) : null;
 
-      // Update total views to match chart data (all-time sum from ViewStat records)
-      const allTimeTotal = stats.reduce((sum, s) => sum + (s.count || 0), 0);
-      if (totalViewsStat) totalViewsStat.textContent = allTimeTotal;
+      // Update total views (all-time sum — only when the full history was fetched)
+      if (totalViewsStat && !hoursAgo) {
+        totalViewsStat.textContent = stats.reduce((sum, st) => sum + (st.count || 0), 0);
+      }
 
-      const filtered = cutoff
-        ? stats.filter(s => new Date(s.hour) >= cutoff)
-        : stats;
+      // Audit #22: continuous hourly series — equal spacing means equal time
+      const series = buildHourlySeries(stats, cutoff);
 
-      if (filtered.length === 0) {
+      if (series.length === 0) {
         chartLoading.textContent = 'No view data for the selected time range.';
         if (chart) { chart.destroy(); chart = null; }
         return;
       }
 
-      const labels = filtered.map(s => {
-        const d = new Date(s.hour);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      });
-      const counts = filtered.map(s => s.count);
+      const labels = series.map(s => formatHour(s.time));
+      const counts = series.map(s => s.count);
 
-      // Collect publish event timestamps
+      // Publish/update markers. Audit #22: several events in the same hour
+      // are kept distinct — the marker label carries the count and the
+      // tooltip lists every event time.
       const publishPoints = [];
-      filtered.forEach((s, idx) => {
-        if (s.publishEvents && s.publishEvents.length > 0) {
-          publishPoints.push({ idx, label: labels[idx], events: s.publishEvents });
+      series.forEach((s, idx) => {
+        if (s.publishEvents.length > 0) {
+          publishPoints.push({ idx, events: s.publishEvents });
         }
       });
 
       if (chart) chart.destroy();
 
-      // Draw publish event lines manually as chartjs plugin
+      // Audit #21: the marker plugin is passed per chart instance (never
+      // registered globally), and reads its points from the chart's own
+      // config — so switching the time range can never leave lines drawn
+      // at positions belonging to the previous range.
       const publishPlugin = {
         id: 'publishLines',
-        afterDraw(chart) {
-          const ctx = chart.ctx;
-          publishPoints.forEach(p => {
-            const x = chart.scales.x.getPixelForValue(p.idx);
-            const topY = chart.scales.y.top;
-            const bottomY = chart.scales.y.bottom;
+        afterDraw(c) {
+          const points = c.config.options.publishPoints || [];
+          const ctx = c.ctx;
+          points.forEach(p => {
+            const x = c.scales.x.getPixelForValue(p.idx);
             ctx.save();
             ctx.setLineDash([4, 4]);
             ctx.strokeStyle = '#b45b3d';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(x, topY);
-            ctx.lineTo(x, bottomY);
+            ctx.moveTo(x, c.scales.y.top);
+            ctx.lineTo(x, c.scales.y.bottom);
             ctx.stroke();
+            if (p.events.length > 1) {
+              ctx.fillStyle = '#b45b3d';
+              ctx.font = '11px Arial';
+              ctx.fillText(`×${p.events.length}`, x + 4, c.scales.y.top + 12);
+            }
             ctx.restore();
           });
         },
@@ -105,6 +154,7 @@
         },
         options: {
           animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : undefined,
+          publishPoints,
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
@@ -114,7 +164,10 @@
                 afterBody: (items) => {
                   const idx = items[0].dataIndex;
                   const hit = publishPoints.find(p => p.idx === idx);
-                  return hit ? ['', '📢 Article published/updated here'] : [];
+                  if (!hit) return [];
+                  return ['', '📢 Published/updated here:'].concat(
+                    hit.events.map(e => '  ' + new Date(e).toLocaleString())
+                  );
                 },
               },
             },

@@ -21,6 +21,18 @@
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
+  // Audit #31: respect Reduced Motion, and move focus to errors so
+  // assistive technology announces them
+  function scrollBehavior() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  }
+
+  function showError(msg) {
+    errorDiv.textContent = msg;
+    errorDiv.classList.remove('hidden');
+    errorDiv.focus();
+  }
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorDiv.classList.add('hidden');
@@ -29,8 +41,7 @@
     const body = bodyInput.value.trim();
 
     if (!author || !body) {
-      errorDiv.textContent = 'Please fill in your name and comment.';
-      errorDiv.classList.remove('hidden');
+      showError('Please fill in your name and comment.');
       return;
     }
 
@@ -48,8 +59,7 @@
       const data = await res.json();
 
       if (!res.ok) {
-        errorDiv.textContent = data.error || 'Failed to post comment. Please try again.';
-        errorDiv.classList.remove('hidden');
+        showError(data.error || 'Failed to post comment. Please try again.');
         return;
       }
 
@@ -74,10 +84,9 @@
       bodyInput.value = '';
 
       // Scroll to new comment
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
     } catch (err) {
-      errorDiv.textContent = 'Network error. Please check your connection.';
-      errorDiv.classList.remove('hidden');
+      showError('Network error. Please check your connection.');
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Post Comment';
