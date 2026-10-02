@@ -37,12 +37,11 @@ exports.getArticles = async (req, res) => {
       query.category = category;
     }
 
-    // viewed/not-viewed filter uses session-stored set of viewed article IDs
-    const viewedIds = req.session.viewedArticles || [];
+    // viewed/not-viewed filter: based on the article's real view count
     if (viewed === 'viewed') {
-      query._id = { $in: viewedIds };
+      query.views = { $gt: 0 };
     } else if (viewed === 'unviewed') {
-      query._id = { $nin: viewedIds };
+      query.views = 0;
     }
 
     const sortOption = sort === 'popularity' ? { views: -1 } : { publishedAt: -1 };
