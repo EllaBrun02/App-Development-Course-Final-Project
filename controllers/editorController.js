@@ -51,6 +51,7 @@ exports.getEditArticle = async (req, res) => {
     if (!article) return res.status(404).render('error', { message: 'Not found', code: 404 });
     res.render('editor/article-edit', {
       article,
+      editTarget: article.status === 'published' && article.pendingUpdate?.status === 'pending' ? 'update' : 'main',
       categories: Article.CATEGORIES,
       user: req.session.userName,
       userRole: req.session.userRole,
@@ -61,20 +62,49 @@ exports.getEditArticle = async (req, res) => {
   }
 };
 
-// Editor edits article content directly
+// The form names its target so a stale pending form cannot overwrite live content.
 exports.editArticle = async (req, res) => {
   try {
-    const { title, content, summary, image, category } = req.body;
+    const { target, category } = req.body;
+    if (!['main', 'update'].includes(target)) return res.status(400).json({ error: 'A valid edit target is required.' });
+    const fields = {};
+    for (const [name, limit] of [['title', 200], ['summary', 500], ['content', Infinity]]) {
+      const value = req.body[name];
+      if (typeof value !== 'string' || !value.trim() || value.trim().length > limit) {
+        return res.status(400).json({ error: `Invalid ${name}.`, field: name });
+      }
+      fields[name] = value.trim();
+    }
+    if (typeof req.body.image !== 'string') return res.status(400).json({ error: 'Invalid image URL.', field: 'image' });
+    fields.image = req.body.image.trim();
+    if (fields.image) {
+      try {
+        if (!['http:', 'https:'].includes(new URL(fields.image).protocol)) throw new Error('Invalid protocol');
+      } catch {
+        return res.status(400).json({ error: 'Use an absolute HTTP or HTTPS image URL.', field: 'image' });
+      }
+    }
+    if (!Article.CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category.', field: 'category' });
     const article = await Article.findById(req.params.id);
     if (!article) return res.status(404).json({ error: 'Not found' });
-    if (!title || !content || !summary) return res.status(400).json({ error: 'Title, summary and content are required.' });
-    article.title = title;
-    article.content = content;
-    article.summary = summary;
-    article.image = image || '';
-    if (category && Article.CATEGORIES.includes(category)) article.category = category;
-    await article.save();
-    logger.info(`Article ${article._id} edited by editor ${req.session.userId}`);
+    const hasUpdate = article.status === 'published' && article.pendingUpdate?.status === 'pending';
+    if ((target === 'update') !== hasUpdate) {
+      return res.status(409).json({ error: 'The review state changed. Reopen the article before editing.' });
+    }
+    if (target === 'update' && category !== article.category) {
+      return res.status(400).json({ error: 'Category cannot change while editing a pending update.', field: 'category' });
+    }
+    const changes = target === 'update'
+      ? Object.fromEntries(Object.entries(fields).map(([key, value]) => [`pendingUpdate.${key}`, value]))
+      : { ...fields, category };
+    // Reject an approval/return/save that raced this request's database read.
+    const saved = await Article.findOneAndUpdate(
+      { _id: article._id, updatedAt: article.updatedAt, status: article.status },
+      { $set: changes },
+      { runValidators: true, new: true }
+    );
+    if (!saved) return res.status(409).json({ error: 'The article changed. Reopen it before saving.' });
+    logger.info(`Article ${article._id} (${target}) edited by editor ${req.session.userId}`);
     res.json({ ok: true });
   } catch (err) {
     logger.error(`Editor edit error: ${err.message}`);

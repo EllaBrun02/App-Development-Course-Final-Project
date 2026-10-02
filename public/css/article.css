@@ -17,7 +17,7 @@
 .article-author { font-weight: 600; color: var(--text); }
 
 .article-hero { margin: 1.5rem 0; border-radius: var(--radius); overflow: hidden; }
-.article-hero img { width: 100%; max-height: 450px; object-fit: cover; display: block; }
+.article-hero img { width: 100%; aspect-ratio: 16 / 9; max-height: 450px; object-fit: cover; display: block; }
 
 .article-summary {
   background: var(--bg); border-left: 4px solid var(--accent);
@@ -25,7 +25,7 @@
   font-style: italic; font-size: 1.05rem; color: var(--text-muted);
 }
 
-.article-body { font-size: 1.05rem; line-height: 1.85; }
+.article-body { font-size: 1.05rem; line-height: 1.85; white-space: pre-wrap; }
 .article-body p { margin-bottom: 1.25rem; }
 
 /* Comments */

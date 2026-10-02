@@ -40,7 +40,7 @@
 
   function renderCard(article) {
     const imgHtml = article.image
-      ? `<div class="article-card-img"><img src="${escHtml(article.image)}" alt="${escHtml(article.title)}" loading="lazy"></div>`
+      ? `<div class="article-card-img"><img src="${escHtml(article.image)}" alt="${escHtml(article.title)}" loading="lazy" data-image-fallback></div>`
       : `<div class="article-card-img"><div class="article-card-img-placeholder"><span aria-hidden="true">dw<span class="placeholder-period">.</span></span><small>${escHtml(article.category)} / The Daily Web</small></div></div>`;
 
     const author = article.author ? escHtml(article.author.name) : 'Unknown';

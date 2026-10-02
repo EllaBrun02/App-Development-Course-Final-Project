@@ -19,9 +19,11 @@ Accessibility improvements include a skip link, keyboard focus indicators, named
 
 ## Running
 
-Install dependencies with `npm install` inside `Code`, start MongoDB, then run `npm start`. The application opens at http://localhost:3000. Only use `npm run seed` when intentionally resetting demo data: the existing seed script clears collections.
+Install dependencies with `npm install` at this repository's root (the folder containing `package.json`), start MongoDB, then run `npm start`. The application opens at http://localhost:3000; set `PORT` and `MONGO_URI` for another local configuration. Only use `npm run seed` when intentionally resetting demo data: the existing seed script clears collections.
 
 ## Verification scope
+
+For the October 2 PR review, regression tests, fixes and limitations, see [DESIGN_PR_REVIEW.md](DESIGN_PR_REVIEW.md). The notes below describe the earlier design-only verification.
 
 Responsive and interaction checks use the actual EJS templates and client scripts with temporary sample API responses. These checks do not verify database persistence, authentication, publishing authorization, real weather fetching, or the full assignment requirements. Run those flows with MongoDB before the project demonstration.
 
