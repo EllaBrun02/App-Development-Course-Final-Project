@@ -1,25 +1,21 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Review: ' + article.title;
-  const hasUpdate = article.pendingUpdate && article.pendingUpdate.status === 'pending';
+  const hasUpdate = !!(article.pendingUpdate && article.pendingUpdate.status === 'pending');
   extraHead = hasUpdate ? '<script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"></script>' : '';
   extraScripts = `<script>
     window.ARTICLE_ID = ${JSON.stringify(article._id.toString())};
     window.HAS_UPDATE = ${hasUpdate};
-    window.ARTICLE_STATUS = ${JSON.stringify(article.status)};
-    ${hasUpdate ? `
-    window.DIFF_OLD = ${JSON.stringify({ title: article.title, summary: article.summary, content: article.content })};
-    window.DIFF_NEW = ${JSON.stringify({ title: article.pendingUpdate.title, summary: article.pendingUpdate.summary, content: article.pendingUpdate.content })};
-    ` : ''}
   </script>
   <script src="/js/editor-review.js"></script>`;
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="review-page">
   <div class="dashboard-header">
     <h1>Article Review</h1>
-    <div style="display:flex;gap:0.5rem">
-      <a href="/editor/articles/<%= article._id %>/edit" class="btn btn-outline">Edit Article</a>
+    <div class="header-actions">
+      <a href="/editor/articles/<%= article._id %>/edit" class="btn btn-outline"><%= hasUpdate ? 'Edit Pending Update' : 'Edit Article' %></a>
       <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
     </div>
   </div>
@@ -35,20 +31,24 @@
       <div class="version-panel">
         <div class="version-label published">Currently Published</div>
         <div class="diff-field-label">Title</div>
-        <div id="diff-title-old" class="diff-content"></div>
+        <div id="diff-title-old" class="diff-content"><%= article.title %></div>
         <div class="diff-field-label">Summary</div>
-        <div id="diff-summary-old" class="diff-content"></div>
+        <div id="diff-summary-old" class="diff-content"><%= article.summary %></div>
         <div class="diff-field-label">Content</div>
-        <div id="diff-content-old" class="diff-content"></div>
+        <div id="diff-content-old" class="diff-content"><%= article.content %></div>
+        <div class="diff-field-label">Image</div>
+        <% if (article.image) { %><img src="<%= article.image %>" alt="Published article image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %>
       </div>
       <div class="version-panel">
         <div class="version-label pending">Pending Update</div>
         <div class="diff-field-label">Title</div>
-        <div id="diff-title-new" class="diff-content"></div>
+        <div id="diff-title-new" class="diff-content"><%= article.pendingUpdate.title %></div>
         <div class="diff-field-label">Summary</div>
-        <div id="diff-summary-new" class="diff-content"></div>
+        <div id="diff-summary-new" class="diff-content"><%= article.pendingUpdate.summary %></div>
         <div class="diff-field-label">Content</div>
-        <div id="diff-content-new" class="diff-content"></div>
+        <div id="diff-content-new" class="diff-content"><%= article.pendingUpdate.content %></div>
+        <div class="diff-field-label">Image</div>
+        <% if (article.pendingUpdate.image) { %><img src="<%= article.pendingUpdate.image %>" alt="Proposed article image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %>
       </div>
     </div>
     <div class="review-actions">
@@ -63,9 +63,9 @@
         <span>By: <%= article.author ? article.author.name : '—' %></span>
       </div>
       <h2 id="review-title"><%= article.title %></h2>
-      <% if (article.image) { %><img src="<%= article.image %>" alt="" class="review-image"><% } %>
+      <% if (article.image) { %><img src="<%= article.image %>" alt="" class="review-image" data-image-fallback><% } %>
       <p class="review-summary"><strong>Summary:</strong> <%= article.summary %></p>
-      <div class="review-body"><%= article.content.replace(/\n/g, '<br>') %></div>
+      <div class="review-body"><%= article.content %></div>
     </div>
 
     <% if (article.status === 'pending') { %>
@@ -85,7 +85,7 @@
     </div>
   </div>
 
-  <div id="action-message" class="action-message hidden"></div>
+  <div id="action-message" class="action-message hidden" role="status" aria-live="polite"></div>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>

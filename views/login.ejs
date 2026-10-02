@@ -1,15 +1,17 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Sign In';
   user = null; userRole = null;
 %>
-<%- include('partials/header') %>
+<%- include('partials/header', { pageTitle, extraHead }) %>
 
 <div class="auth-page">
   <div class="auth-card">
     <div class="auth-logo">
       <span class="logo-the">The</span><span class="logo-daily"> Daily</span><span class="logo-web"> Web</span>
     </div>
-    <h1 class="auth-title">Staff Sign In</h1>
+    <h1 class="auth-title">Welcome to the newsroom.</h1>
+    <p class="auth-description">Sign in to write, edit, and bring stories to life.</p>
     <% if (error) { %>
       <div class="error-message"><%= error %></div>
     <% } %>
@@ -30,4 +32,4 @@
   </div>
 </div>
 
-<%- include('partials/footer') %>
+<%- include('partials/footer', { extraScripts }) %>

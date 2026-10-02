@@ -1,38 +1,42 @@
 <%
-  pageTitle = 'Edit: ' + article.title;
+  let pageTitle, extraHead = '', extraScripts = '';
+  const editingUpdate = editTarget === 'update';
+  const editable = editingUpdate ? article.pendingUpdate : article;
+  pageTitle = 'Edit: ' + editable.title;
   extraScripts = `<script>
     window.ARTICLE_ID = ${JSON.stringify(article._id.toString())};
   </script>
   <script src="/js/editor-edit.js"></script>`;
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="editor-page">
   <div class="dashboard-header">
     <div>
-      <h1>Edit Article</h1>
+      <h1><%= editingUpdate ? 'Edit Pending Update' : 'Edit Article' %></h1>
       <p class="analytics-meta">
         By <%= article.author ? article.author.name : '—' %> &bull;
         <span class="status-badge status-<%= article.status %>"><%= article.status %></span>
       </p>
     </div>
-    <div style="display:flex;gap:0.5rem">
+    <div class="header-actions">
       <a href="/editor/articles/<%= article._id %>" class="btn btn-outline">&larr; Back to Review</a>
       <a href="/editor" class="btn btn-outline">Dashboard</a>
     </div>
   </div>
 
-  <div id="edit-message" class="action-message hidden"></div>
+  <% if (editingUpdate) { %><p class="info-banner">Changes stay in the pending update until you approve it. The published article remains unchanged.</p><% } %>
+  <div id="edit-message" class="action-message hidden" role="status" aria-live="polite"></div>
 
-  <div class="article-editor-form">
+  <form id="editor-edit-form" class="article-edit-form" data-edit-target="<%= editTarget %>">
     <div class="form-group">
       <label for="edit-title">Title <span class="required">*</span></label>
-      <input type="text" id="edit-title" class="form-control" value="<%= article.title %>" maxlength="200" required />
+      <input type="text" id="edit-title" class="form-control" value="<%= editable.title %>" maxlength="200" required />
     </div>
 
     <div class="form-group">
       <label for="edit-category">Category</label>
-      <select id="edit-category" class="filter-select">
+      <select id="edit-category" class="filter-select" <%= editingUpdate ? 'disabled' : '' %>>
         <% categories.forEach(cat => { %>
           <option value="<%= cat %>" <%= article.category === cat ? 'selected' : '' %>><%= cat %></option>
         <% }); %>
@@ -41,24 +45,24 @@
 
     <div class="form-group">
       <label for="edit-image">Image URL</label>
-      <input type="url" id="edit-image" class="form-control" value="<%= article.image || '' %>" placeholder="https://..." />
+      <input type="url" id="edit-image" class="form-control" value="<%= editable.image || '' %>" placeholder="https://..." />
     </div>
 
     <div class="form-group">
       <label for="edit-summary">Summary <span class="required">*</span></label>
-      <textarea id="edit-summary" class="form-control" rows="3" maxlength="500" required><%= article.summary %></textarea>
+      <textarea id="edit-summary" class="form-control" rows="3" maxlength="500" required><%= editable.summary %></textarea>
     </div>
 
     <div class="form-group">
       <label for="edit-content">Content <span class="required">*</span></label>
-      <textarea id="edit-content" class="form-control article-content-textarea" rows="20" required><%= article.content %></textarea>
+      <textarea id="edit-content" class="form-control article-content-textarea" rows="20" required><%= editable.content %></textarea>
     </div>
 
     <div class="form-actions">
-      <button id="save-btn" class="btn btn-primary">Save Changes</button>
+      <button type="submit" id="save-btn" class="btn btn-primary">Save Changes</button>
       <a href="/editor/articles/<%= article._id %>" class="btn btn-outline">Cancel</a>
     </div>
-  </div>
+  </form>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>

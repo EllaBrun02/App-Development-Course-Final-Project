@@ -1,8 +1,9 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Editor Dashboard';
   extraScripts = '<script src="/js/editor.js"></script>';
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="dashboard-page">
   <div class="dashboard-header">
@@ -10,14 +11,14 @@
   </div>
 
   <form class="filter-form" method="GET" action="/editor">
-    <select name="status" class="filter-select">
+    <select aria-label="Filter by status" name="status" class="filter-select">
       <option value="">All Statuses</option>
       <option value="draft" <%= filterStatus === 'draft' ? 'selected' : '' %>>Draft</option>
       <option value="pending" <%= filterStatus === 'pending' ? 'selected' : '' %>>Pending Review</option>
       <option value="published" <%= filterStatus === 'published' ? 'selected' : '' %>>Published</option>
       <option value="returned" <%= filterStatus === 'returned' ? 'selected' : '' %>>Returned</option>
     </select>
-    <select name="category" class="filter-select">
+    <select aria-label="Filter by category" name="category" class="filter-select">
       <option value="">All Categories</option>
       <% categories.forEach(cat => { %>
         <option value="<%= cat %>" <%= filterCategory === cat ? 'selected' : '' %>><%= cat %></option>
@@ -83,4 +84,4 @@
   <% } %>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>
