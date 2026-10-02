@@ -5,6 +5,7 @@ const { getWeather } = require('../utils/weather');
 const logger = require('../utils/logger');
 
 const PAGE_SIZE = 20;
+const v = require('../utils/validation');
 
 exports.getHome = async (req, res) => {
   try {
@@ -17,36 +18,42 @@ exports.getHome = async (req, res) => {
     });
   } catch (err) {
     logger.error(`Home page error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
+    require('../utils/validation').errorResponse(err, req, res);
   }
 };
 
 // API: paginated published articles with search/filter/sort
 exports.getArticles = async (req, res) => {
   try {
-    const { page = 1, search, category, sort = 'date', viewed } = req.query;
+    const { page = '1', search, category, sort = 'date', viewed } = req.query;
     const query = { status: 'published' };
+    const pageNumber = v.page(page);
+    if (search !== undefined) v.text(search, 'search', 200);
+    if (category && !Article.CATEGORIES.includes(category)) v.bad('Invalid category');
+    if (!['date','popularity'].includes(sort)) v.bad('Invalid sort');
+    if (viewed && !['viewed','unviewed'].includes(viewed)) v.bad('Invalid viewed filter');
 
     if (search) {
       query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { summary: { $regex: search, $options: 'i' } },
+        { title: { $regex: v.literal(search), $options: 'i' } },
+        { summary: { $regex: v.literal(search), $options: 'i' } },
       ];
     }
     if (category && Article.CATEGORIES.includes(category)) {
       query.category = category;
     }
 
-    // viewed/not-viewed filter: based on the article's real view count
+    // Reading history belongs to the current visitor, not all site readers.
+    const viewedIds = req.session.viewedArticles || [];
     if (viewed === 'viewed') {
-      query.views = { $gt: 0 };
+      query._id = { $in: viewedIds };
     } else if (viewed === 'unviewed') {
-      query.views = 0;
+      query._id = { $nin: viewedIds };
     }
 
-    const sortOption = sort === 'popularity' ? { views: -1 } : { publishedAt: -1 };
+    const sortOption = sort === 'popularity' ? { views: -1, _id: -1 } : { publishedAt: -1, _id: -1 };
 
-    const skip = (parseInt(page) - 1) * PAGE_SIZE;
+    const skip = (pageNumber - 1) * PAGE_SIZE;
     const articles = await Article.find(query)
       .select('title summary image category author publishedAt views')
       .populate('author', 'name')
@@ -60,7 +67,7 @@ exports.getArticles = async (req, res) => {
     res.json({ articles, hasMore });
   } catch (err) {
     logger.error(`Articles API error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
+    require('../utils/validation').errorResponse(err, req, res);
   }
 };
 
@@ -95,7 +102,7 @@ exports.getArticlePage = async (req, res) => {
     });
   } catch (err) {
     logger.error(`Article page error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
+    require('../utils/validation').errorResponse(err, req, res);
   }
 };
 

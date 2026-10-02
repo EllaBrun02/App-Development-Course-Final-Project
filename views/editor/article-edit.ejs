@@ -28,10 +28,10 @@
   <% if (editingUpdate) { %><p class="info-banner">Changes stay in the pending update until you approve it. The published article remains unchanged.</p><% } %>
   <div id="edit-message" class="action-message hidden" role="status" aria-live="polite"></div>
 
-  <form id="editor-edit-form" class="article-edit-form" data-edit-target="<%= editTarget %>">
+  <form id="editor-edit-form" class="article-edit-form" data-edit-target="<%= editTarget %>" data-revision="<%= article.__v %>" data-partial="<%= article.status === 'draft' %>">
     <div class="form-group">
       <label for="edit-title">Title <span class="required">*</span></label>
-      <input type="text" id="edit-title" class="form-control" value="<%= editable.title %>" maxlength="200" required />
+      <input type="text" id="edit-title" class="form-control" value="<%= editable.title %>" maxlength="200" <%= article.status === 'draft' ? '' : 'required' %> />
     </div>
 
     <div class="form-group">
@@ -50,12 +50,12 @@
 
     <div class="form-group">
       <label for="edit-summary">Summary <span class="required">*</span></label>
-      <textarea id="edit-summary" class="form-control" rows="3" maxlength="500" required><%= editable.summary %></textarea>
+      <textarea id="edit-summary" class="form-control" rows="3" maxlength="500" <%= article.status === 'draft' ? '' : 'required' %>><%= editable.summary %></textarea>
     </div>
 
     <div class="form-group">
       <label for="edit-content">Content <span class="required">*</span></label>
-      <textarea id="edit-content" class="form-control article-content-textarea" rows="20" required><%= editable.content %></textarea>
+      <textarea id="edit-content" class="form-control article-content-textarea" rows="20" maxlength="100000" <%= article.status === 'draft' ? '' : 'required' %>><%= editable.content %></textarea>
     </div>
 
     <div class="form-actions">

@@ -1,39 +1,66 @@
-const Article = require('../models/Article');
-const ViewStat = require('../models/ViewStat');
-const logger = require('../utils/logger');
+const Article = require("../models/Article");
+const ViewStat = require("../models/ViewStat");
+const logger = require("../utils/logger");
+const v = require("../utils/validation");
 
 exports.getDashboard = async (req, res) => {
   try {
-    const { status, category } = req.query;
+    const { status, category, search } = req.query;
     const query = {};
-    if (status) query.status = status;
-    if (category && Article.CATEGORIES.includes(category)) query.category = category;
+    if (search !== undefined) {
+      v.text(search, "search", 200);
+      query.title = { $regex: v.literal(search), $options: "i" };
+    }
+    if (
+      status &&
+      !["draft", "pending", "published", "returned"].includes(status)
+    )
+      v.bad("Invalid status");
+    if (category && !Article.CATEGORIES.includes(category))
+      v.bad("Invalid category");
+    if (status === "pending")
+      query.$or = [
+        { status: "pending" },
+        { status: "published", "pendingUpdate.status": "pending" },
+      ];
+    else if (status) query.status = status;
+    if (category && Article.CATEGORIES.includes(category))
+      query.category = category;
 
     // Also fetch articles with pending updates
     const articles = await Article.find(query)
-      .select('title status category author publishedAt createdAt pendingUpdate')
-      .populate('author', 'name')
+      .select(
+        "title status category author publishedAt createdAt pendingUpdate",
+      )
+      .populate("author", "name")
       .sort({ updatedAt: -1 });
 
-    res.render('editor/dashboard', {
+    res.render("editor/dashboard", {
       articles,
       categories: Article.CATEGORIES,
-      filterStatus: status || '',
-      filterCategory: category || '',
+      search: search || "",
+      filterStatus: status || "",
+      filterCategory: category || "",
       user: req.session.userName,
       userRole: req.session.userRole,
     });
   } catch (err) {
     logger.error(`Editor dashboard error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
+    require("../utils/validation").errorResponse(err, req, res);
   }
 };
 
 exports.getArticleReview = async (req, res) => {
   try {
-    const article = await Article.findById(req.params.id).populate('author', 'name');
-    if (!article) return res.status(404).render('error', { message: 'Not found', code: 404 });
-    res.render('editor/article-review', {
+    const article = await Article.findById(req.params.id).populate(
+      "author",
+      "name",
+    );
+    if (!article)
+      return res
+        .status(404)
+        .render("error", { message: "Not found", code: 404 });
+    res.render("editor/article-review", {
       article,
       categories: Article.CATEGORIES,
       user: req.session.userName,
@@ -41,74 +68,74 @@ exports.getArticleReview = async (req, res) => {
     });
   } catch (err) {
     logger.error(`Article review error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
+    require("../utils/validation").errorResponse(err, req, res);
   }
 };
 
+// Explicit version target prevents editing live content while reviewing an update.
 exports.getEditArticle = async (req, res) => {
   try {
     const article = await Article.findById(req.params.id).populate('author', 'name');
-    if (!article) return res.status(404).render('error', { message: 'Not found', code: 404 });
-    res.render('editor/article-edit', {
+    if (!article) v.bad("Not found", 404);
+    const target =
+      req.query.target ||
+      (article.pendingUpdate?.status === "pending" ? "update" : "main");
+    if (!["main", "update"].includes(target)) v.bad("Invalid target");
+    if (target === "main" && article.status === "published")
+      v.bad("Published content must be changed through a pending update", 409);
+    if (
+      target === "update" &&
+      !(
+        article.status === "published" &&
+        article.pendingUpdate?.status === "pending"
+      )
+    )
+      v.bad("No pending update", 409);
+    res.render("editor/article-edit", {
       article,
-      editTarget: article.status === 'published' && article.pendingUpdate?.status === 'pending' ? 'update' : 'main',
+      editTarget: target,
       categories: Article.CATEGORIES,
       user: req.session.userName,
       userRole: req.session.userRole,
     });
   } catch (err) {
-    logger.error(`Editor get edit error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
+    v.errorResponse(err, req, res);
   }
 };
-
-// The form names its target so a stale pending form cannot overwrite live content.
 exports.editArticle = async (req, res) => {
   try {
-    const { target, category } = req.body;
-    if (!['main', 'update'].includes(target)) return res.status(400).json({ error: 'A valid edit target is required.' });
-    const fields = {};
-    for (const [name, limit] of [['title', 200], ['summary', 500], ['content', Infinity]]) {
-      const value = req.body[name];
-      if (typeof value !== 'string' || !value.trim() || value.trim().length > limit) {
-        return res.status(400).json({ error: `Invalid ${name}.`, field: name });
-      }
-      fields[name] = value.trim();
-    }
-    if (typeof req.body.image !== 'string') return res.status(400).json({ error: 'Invalid image URL.', field: 'image' });
-    fields.image = req.body.image.trim();
-    if (fields.image) {
-      try {
-        if (!['http:', 'https:'].includes(new URL(fields.image).protocol)) throw new Error('Invalid protocol');
-      } catch {
-        return res.status(400).json({ error: 'Use an absolute HTTP or HTTPS image URL.', field: 'image' });
-      }
-    }
-    if (!Article.CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category.', field: 'category' });
     const article = await Article.findById(req.params.id);
-    if (!article) return res.status(404).json({ error: 'Not found' });
-    const hasUpdate = article.status === 'published' && article.pendingUpdate?.status === 'pending';
-    if ((target === 'update') !== hasUpdate) {
-      return res.status(409).json({ error: 'The review state changed. Reopen the article before editing.' });
+    if (!article) v.bad("Not found", 404);
+    v.revision(article, req.body);
+    const target = req.body.target;
+    if (!["main", "update"].includes(target))
+      v.bad("Choose the version to edit");
+    if (req.body.category !== undefined && !Article.CATEGORIES.includes(req.body.category))
+      v.bad("Invalid category");
+    if (target === "update") {
+      if (
+        article.status !== "published" ||
+        article.pendingUpdate?.status !== "pending"
+      )
+        v.bad("No pending update", 409);
+      if (req.body.category !== undefined && req.body.category !== article.category)
+        v.bad("Category cannot change while editing a pending update");
+      Object.assign(article.pendingUpdate, v.content(req.body, true));
+      article.pendingUpdate.autoSave = undefined;
+    } else {
+      if (article.status === "published")
+        v.bad(
+          "Published content must be changed through a pending update",
+          409,
+        );
+      Object.assign(article, v.content(req.body, article.status !== "draft"));
+      if (req.body.category !== undefined) article.category = req.body.category;
+      article.autoSave = undefined;
     }
-    if (target === 'update' && category !== article.category) {
-      return res.status(400).json({ error: 'Category cannot change while editing a pending update.', field: 'category' });
-    }
-    const changes = target === 'update'
-      ? Object.fromEntries(Object.entries(fields).map(([key, value]) => [`pendingUpdate.${key}`, value]))
-      : { ...fields, category };
-    // Reject an approval/return/save that raced this request's database read.
-    const saved = await Article.findOneAndUpdate(
-      { _id: article._id, updatedAt: article.updatedAt, status: article.status },
-      { $set: changes },
-      { runValidators: true, new: true }
-    );
-    if (!saved) return res.status(409).json({ error: 'The article changed. Reopen it before saving.' });
-    logger.info(`Article ${article._id} (${target}) edited by editor ${req.session.userId}`);
-    res.json({ ok: true });
+    await article.save();
+    res.json({ ok: true, revision: article.__v });
   } catch (err) {
-    logger.error(`Editor edit error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
+    v.errorResponse(err, req, res);
   }
 };
 
@@ -116,23 +143,27 @@ exports.editArticle = async (req, res) => {
 exports.publishArticle = async (req, res) => {
   try {
     const article = await Article.findById(req.params.id);
-    if (!article) return res.status(404).json({ error: 'Not found' });
-    if (article.status !== 'pending') return res.status(400).json({ error: 'Article is not pending.' });
+    if (!article) return res.status(404).json({ error: "Not found" });
+    if (article.status !== "pending")
+      return res.status(400).json({ error: "Article is not pending." });
 
     const publishedAt = new Date();
-    article.status = 'published';
+    v.content(article.toObject(), true);
+    article.status = "published";
     article.publishedAt = publishedAt;
-    article.editorNote = '';
+    article.editorNote = "";
     await article.save();
 
     // Record publish event in view stats
     await recordPublishEvent(article._id, publishedAt);
 
-    logger.info(`Article ${article._id} published by editor ${req.session.userId}`);
+    logger.info(
+      `Article ${article._id} published by editor ${req.session.userId}`,
+    );
     res.json({ ok: true });
   } catch (err) {
     logger.error(`Publish error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
+    require("../utils/validation").errorResponse(err, req, res);
   }
 };
 
@@ -140,11 +171,18 @@ exports.publishArticle = async (req, res) => {
 exports.approveUpdate = async (req, res) => {
   try {
     const article = await Article.findById(req.params.id);
-    if (!article || article.status !== 'published') return res.status(404).json({ error: 'Not found' });
-    if (!article.pendingUpdate || article.pendingUpdate.status !== 'pending') {
-      return res.status(400).json({ error: 'No pending update.' });
+    if (!article || article.status !== "published")
+      return res.status(404).json({ error: "Not found" });
+    if (!article.pendingUpdate || article.pendingUpdate.status !== "pending") {
+      return res.status(400).json({ error: "No pending update." });
     }
 
+    v.content(
+      article.pendingUpdate.toObject
+        ? article.pendingUpdate.toObject()
+        : article.pendingUpdate,
+      true,
+    );
     const updateTime = new Date();
     article.title = article.pendingUpdate.title;
     article.content = article.pendingUpdate.content;
@@ -156,87 +194,114 @@ exports.approveUpdate = async (req, res) => {
 
     await recordPublishEvent(article._id, updateTime);
 
-    logger.info(`Article ${article._id} update approved by editor ${req.session.userId}`);
+    logger.info(
+      `Article ${article._id} update approved by editor ${req.session.userId}`,
+    );
     res.json({ ok: true });
   } catch (err) {
     logger.error(`Approve update error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
+    require("../utils/validation").errorResponse(err, req, res);
   }
 };
 
 // Return article to reporter with a note
 exports.returnArticle = async (req, res) => {
   try {
-    const { note, isUpdate } = req.body;
+    const { note } = req.body;
+    v.text(note, "editor note", 2000, true);
+    const isUpdate = v.boolean(req.body.isUpdate, "isUpdate");
     const article = await Article.findById(req.params.id);
-    if (!article) return res.status(404).json({ error: 'Not found' });
+    if (!article) return res.status(404).json({ error: "Not found" });
 
     if (isUpdate) {
-      if (!article.pendingUpdate) return res.status(400).json({ error: 'No pending update.' });
-      article.pendingUpdate.status = 'returned';
-      article.pendingUpdate.editorNote = note || '';
+      if (
+        article.status !== "published" ||
+        article.pendingUpdate?.status !== "pending"
+      )
+        return res.status(409).json({ error: "No pending update." });
+      article.pendingUpdate.status = "returned";
+      article.pendingUpdate.editorNote = note || "";
     } else {
-      if (article.status !== 'pending') return res.status(400).json({ error: 'Not pending.' });
-      article.status = 'returned';
-      article.editorNote = note || '';
+      if (article.status !== "pending")
+        return res.status(400).json({ error: "Not pending." });
+      article.status = "returned";
+      article.editorNote = note || "";
     }
     await article.save();
 
-    logger.info(`Article ${article._id} returned to reporter by editor ${req.session.userId}`);
+    logger.info(
+      `Article ${article._id} returned to reporter by editor ${req.session.userId}`,
+    );
     res.json({ ok: true });
   } catch (err) {
     logger.error(`Return article error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
+    require("../utils/validation").errorResponse(err, req, res);
   }
 };
 
 // Delete article
 exports.deleteArticle = async (req, res) => {
   try {
-    await Article.findByIdAndDelete(req.params.id);
-    logger.info(`Article ${req.params.id} deleted by editor ${req.session.userId}`);
+    const deleted = await Article.findByIdAndDelete(req.params.id);
+    if (!deleted) v.bad("Not found", 404);
+    logger.info(
+      `Article ${req.params.id} deleted by editor ${req.session.userId}`,
+    );
     res.json({ ok: true });
   } catch (err) {
     logger.error(`Delete error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
+    require("../utils/validation").errorResponse(err, req, res);
   }
 };
 
 // Analytics: view stats for an article
 exports.getAnalytics = async (req, res) => {
   try {
-    const article = await Article.findById(req.params.id).populate('author', 'name');
-    if (!article) return res.status(404).render('error', { message: 'Not found', code: 404 });
+    const article = await Article.findById(req.params.id).populate(
+      "author",
+      "name",
+    );
+    if (!article)
+      return res
+        .status(404)
+        .render("error", { message: "Not found", code: 404 });
 
-    res.render('editor/analytics', {
+    res.render("editor/analytics", {
       article,
       user: req.session.userName,
       userRole: req.session.userRole,
     });
   } catch (err) {
     logger.error(`Analytics page error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
+    require("../utils/validation").errorResponse(err, req, res);
   }
 };
 
 // Analytics API: return time-series data
 exports.getAnalyticsData = async (req, res) => {
   try {
-    const stats = await ViewStat.find({ article: req.params.id }).sort({ hour: 1 });
+    const stats = await ViewStat.find({ article: req.params.id }).sort({
+      hour: 1,
+    });
     res.json({ stats });
   } catch (err) {
     logger.error(`Analytics data error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
+    require("../utils/validation").errorResponse(err, req, res);
   }
 };
 
 async function recordPublishEvent(articleId, time) {
-  const hour = new Date(time.getFullYear(), time.getMonth(), time.getDate(), time.getHours());
+  const hour = new Date(
+    time.getFullYear(),
+    time.getMonth(),
+    time.getDate(),
+    time.getHours(),
+  );
   try {
     await ViewStat.findOneAndUpdate(
       { article: articleId, hour },
       { $push: { publishEvents: time } },
-      { upsert: true }
+      { upsert: true },
     );
   } catch (err) {
     logger.error(`Publish event record error: ${err.message}`);

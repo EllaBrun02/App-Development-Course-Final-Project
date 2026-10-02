@@ -10,6 +10,7 @@ exports.getLogin = (req, res) => {
 
 exports.postLogin = async (req, res) => {
   const { username, password } = req.body;
+  if (typeof username !== 'string' || typeof password !== 'string' || username.length > 80 || password.length > 100) return res.status(400).render('login',{error:'Invalid credentials format.'});
   if (!username || !password) {
     return res.render('login', { error: 'Please fill in all fields.' });
   }

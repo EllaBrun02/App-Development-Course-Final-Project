@@ -15,7 +15,9 @@
   <div class="dashboard-header">
     <h1>Article Review</h1>
     <div class="header-actions">
-      <a href="/editor/articles/<%= article._id %>/edit" class="btn btn-outline"><%= hasUpdate ? 'Edit Pending Update' : 'Edit Article' %></a>
+      <% if (article.status !== 'published' || hasUpdate) { %>
+        <a href="/editor/articles/<%= article._id %>/edit" class="btn btn-outline"><%= hasUpdate ? 'Edit Pending Update' : 'Edit Article' %></a>
+      <% } %>
       <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
     </div>
   </div>
