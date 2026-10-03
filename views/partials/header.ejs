@@ -8,12 +8,13 @@
   <% if (typeof extraHead !== 'undefined') { %><%- extraHead %><% } %>
 </head>
 <body>
+  <a class="skip-link" href="#page-content">Skip to content</a>
   <header class="site-header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <span class="logo-the">The</span><span class="logo-daily"> Daily</span><span class="logo-web"> Web</span>
+        <span class="brand-symbol" aria-hidden="true">dw</span><span class="logo-the">The</span><span class="logo-daily"> Daily</span><span class="logo-web"> Web</span>
       </a>
-      <nav class="main-nav">
+      <nav class="main-nav" aria-label="Main navigation">
         <a href="/">Home</a>
         <% if (typeof userRole !== 'undefined' && userRole === 'reporter') { %>
           <a href="/reporter">My Articles</a>
@@ -23,7 +24,7 @@
           <a href="/editor">Editor Dashboard</a>
         <% } %>
         <% if (typeof user !== 'undefined' && user) { %>
-          <span class="nav-user">👤 <%= user %></span>
+          <span class="nav-user"><%= user %></span>
           <a href="/logout" class="btn btn-outline">Sign Out</a>
         <% } else { %>
           <a href="/login" class="btn btn-primary">Sign In</a>
@@ -31,4 +32,4 @@
       </nav>
     </div>
   </header>
-  <div class="page-wrapper">
+  <div class="page-wrapper" id="page-content" tabindex="-1">

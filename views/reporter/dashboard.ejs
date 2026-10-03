@@ -1,8 +1,9 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'My Articles';
-  extraScripts = '<script src="/js/reporter.js"></script>';
+
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="dashboard-page">
   <div class="dashboard-header">
@@ -79,4 +80,4 @@
   <% } %>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>

@@ -1,194 +1,279 @@
 (function () {
-  'use strict';
-
-  const ARTICLE_ID = window.ARTICLE_ID;
-  const IS_PUBLISHED = window.IS_PUBLISHED;
-  const HAS_PENDING_UPDATE = window.HAS_PENDING_UPDATE;
-  const form = document.getElementById('article-form');
-  const autosaveStatus = document.getElementById('autosave-status');
-  const formError = document.getElementById('form-error');
-
+  "use strict";
+  const form = document.getElementById("article-form");
   if (!form) return;
-
-  function getFormData() {
-    return {
-      title: (document.getElementById('title') || {}).value || '',
-      content: (document.getElementById('content') || {}).value || '',
-      summary: (document.getElementById('summary') || {}).value || '',
-      image: (document.getElementById('image') || {}).value || '',
-      category: (document.getElementById('category') || {}).value || '',
-    };
+  let id = window.ARTICLE_ID,
+    revision = window.ARTICLE_REVISION || 0;
+  const editable = window.ARTICLE_EDITABLE !== false;
+  const status = document.getElementById("autosave-status"),
+    error = document.getElementById("form-error");
+  const fields = ["title", "summary", "content", "image", "category"];
+  let timer = null,
+    dirty = false,
+    busy = false,
+    queue = Promise.resolve();
+  let key = `dailyweb:draft:${window.ARTICLE_USER}:${id || "new"}`;
+  let draftKey = crypto.randomUUID(),
+    saved = "";
+  function data() {
+    return Object.fromEntries(
+      fields.map((k) => [k, document.getElementById(k)?.value || ""]),
+    );
   }
-
-  function showError(msg) {
-    formError.textContent = msg;
-    formError.classList.remove('hidden');
-    formError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  function message(text) {
+    status.textContent = text;
   }
-
-  function hideError() { formError.classList.add('hidden'); }
-
-  function validate() {
-    const d = getFormData();
-    if (!d.title.trim()) { showError('Title is required.'); return false; }
-    if (!d.content.trim()) { showError('Article content is required.'); return false; }
-    if (!d.summary.trim()) { showError('Summary is required.'); return false; }
-    hideError();
-    return true;
+  function showError(e) {
+    error.textContent = e.message || String(e);
+    error.classList.remove("hidden");
+    // Audit #31: move focus so screen readers announce the error
+    if (typeof error.focus === "function") error.focus();
   }
-
-  // Auto-save: debounced, every 3s after last change
-  let autoSaveTimer = null;
-  let lastSaved = null;
-
-  function scheduleAutoSave() {
-    if (!ARTICLE_ID) return;
-    clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(doAutoSave, 3000);
-  }
-
-  async function doAutoSave() {
-    if (!ARTICLE_ID) return;
-    const data = { ...getFormData(), isUpdate: IS_PUBLISHED };
+  function backup() {
     try {
-      const res = await fetch(`/reporter/articles/${ARTICLE_ID}/autosave`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        lastSaved = new Date(result.savedAt);
-        autosaveStatus.textContent = `✓ Auto-saved at ${lastSaved.toLocaleTimeString()}`;
-      }
+      localStorage.setItem(
+        key,
+        JSON.stringify({ data: data(), revision, draftKey }),
+      );
     } catch (e) {
-      autosaveStatus.textContent = '⚠ Auto-save failed';
+      message(
+        "Not saved locally. Keep this page open until the server confirms saving.",
+      );
     }
   }
-
-  // Listen for changes to trigger auto-save
-  ['title', 'content', 'summary', 'image'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('input', scheduleAutoSave);
-  });
-
-  // Save draft button
-  const saveDraftBtn = document.getElementById('save-draft-btn');
-  if (saveDraftBtn) {
-    saveDraftBtn.addEventListener('click', async () => {
-      if (!validate()) return;
-      const data = getFormData();
-      saveDraftBtn.disabled = true;
-      saveDraftBtn.textContent = 'Saving...';
+  function acknowledge(snapshot) {
+    saved = JSON.stringify(snapshot);
+    dirty = JSON.stringify(data()) !== saved;
+    if (dirty) backup();
+    else {
       try {
-        const url = ARTICLE_ID
-          ? `/reporter/articles/${ARTICLE_ID}/save`
-          : '/reporter/articles';
-        const method = ARTICLE_ID ? 'PATCH' : 'POST';
-        const res = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
+        localStorage.removeItem(key);
+      } catch {}
+    }
+    message(dirty ? "Changes not saved yet" : "Saved to server");
+    error.classList.add("hidden");
+  }
+  // A local recovery copy protects the last keystrokes; acknowledged work lives on the server.
+  try {
+    const cached = JSON.parse(localStorage.getItem(key) || "null");
+    if (cached && editable) {
+      if (cached.revision === revision) {
+        for (const k of fields)
+          if (typeof cached.data[k] === "string")
+            document.getElementById(k).value = cached.data[k];
+        draftKey = cached.draftKey;
+        dirty = true;
+        message("Recovered unsaved work; saving to server…");
+      } else {
+        showError(
+          new Error(
+            "The server changed since this local draft was saved. Review the server version before restoring your local work.",
+          ),
+        );
+        const restore = document.createElement("button");
+        restore.type = "button";
+        restore.textContent = "Restore local draft";
+        restore.addEventListener("click", () => {
+          if (
+            !confirm(
+              "Replace the displayed fields with the local recovery copy?",
+            )
+          )
+            return;
+          for (const k of fields)
+            if (typeof cached.data[k] === "string")
+              document.getElementById(k).value = cached.data[k];
+          dirty = true;
+          backup();
+          message("Local work restored; saving…");
+          restore.remove();
+          flush().catch(failed);
         });
-        const result = await res.json();
-        if (!res.ok) { showError(result.error || 'Save failed.'); return; }
-        if (!ARTICLE_ID && result.id) {
-          // New article created, redirect to edit page
-          window.location.href = `/reporter/articles/${result.id}/edit`;
-        } else {
-          autosaveStatus.textContent = '✓ Draft saved';
-        }
-      } catch (e) {
-        showError('Network error during save.');
-      } finally {
-        saveDraftBtn.disabled = false;
-        saveDraftBtn.textContent = 'Save Draft';
+        error.after(restore);
       }
+    }
+  } catch (e) {
+    showError(
+      new Error(
+        "Local recovery is unavailable. Keep the page open until saving completes.",
+      ),
+    );
+  }
+  async function api(url, body, method = "PATCH", keepalive = false) {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+      keepalive,
+    });
+    let result;
+    try {
+      result = await res.json();
+    } catch {
+      throw new Error("Save failed. Please sign in again or retry.");
+    }
+    if (!res.ok) throw new Error(result.error || "Save failed");
+    if (result.revision !== undefined) revision = result.revision;
+    return result;
+  }
+  async function ensureId(snapshot) {
+    if (id) return;
+    const category = document.getElementById("category");
+    category.disabled = true;
+    let result;
+    try {
+      result = await api(
+        "/reporter/articles",
+        { ...snapshot, draftKey },
+        "POST",
+      );
+    } catch (err) {
+      category.disabled = busy || !editable;
+      throw err;
+    }
+    id = result.id;
+    // Move recovery before removing its old key; retain it if navigation interrupts.
+    const old = key;
+    key = `dailyweb:draft:${window.ARTICLE_USER}:${id}`;
+    backup();
+    try {
+      localStorage.removeItem(old);
+    } catch {}
+    window.history.replaceState(null, "", `/reporter/articles/${id}/edit`);
+    document.getElementById("category").disabled = true;
+  }
+  function enqueue(task) {
+    const next = queue.catch(() => {}).then(task);
+    queue = next;
+    return next;
+  }
+  function failed(e) {
+    dirty = true;
+    backup();
+    message(
+      "Auto-save failed — changes not saved to server. Retry by editing or pressing Save Draft.",
+    );
+    showError(e);
+  }
+  function flush(keepalive = false) {
+    clearTimeout(timer);
+    return enqueue(async () => {
+      if (!editable || !dirty) return;
+      const snapshot = data();
+      message("Saving…");
+      await ensureId(snapshot);
+      await api(
+        `/reporter/articles/${id}/autosave`,
+        { ...snapshot, isUpdate: !!window.IS_PUBLISHED, revision },
+        "PATCH",
+        keepalive,
+      );
+      acknowledge(snapshot);
     });
   }
-
-  // Submit for review
-  const submitBtn = document.getElementById('submit-btn');
-  if (submitBtn) {
-    submitBtn.addEventListener('click', async () => {
-      if (!validate()) return;
-      if (!confirm('Submit this article for editor review?')) return;
-      const data = getFormData();
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
-      try {
-        if (!ARTICLE_ID) {
-          // First create the article, then submit
-          const createRes = await fetch('/reporter/articles', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          const created = await createRes.json();
-          if (!createRes.ok) { showError(created.error || 'Create failed.'); return; }
-          const submitRes = await fetch(`/reporter/articles/${created.id}/submit`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          if (!submitRes.ok) { showError('Submission failed.'); return; }
-          window.location.href = '/reporter';
-        } else {
-          const res = await fetch(`/reporter/articles/${ARTICLE_ID}/submit`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          const result = await res.json();
-          if (!res.ok) { showError(result.error || 'Submission failed.'); return; }
-          window.location.href = '/reporter';
-        }
-      } catch (e) {
-        showError('Network error during submission.');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit for Review';
-      }
+  for (const k of fields) {
+    const input = document.getElementById(k);
+    if (!editable) {
+      input.disabled = true;
+      continue;
+    }
+    input.addEventListener("input", () => {
+      dirty = true;
+      backup();
+      message("Changes not saved yet");
+      clearTimeout(timer);
+      timer = setTimeout(() => flush().catch(failed), id ? 1000 : 350);
     });
   }
-
-  // Submit update to published article
-  const submitUpdateBtn = document.getElementById('submit-update-btn');
-  if (submitUpdateBtn) {
-    submitUpdateBtn.addEventListener('click', async () => {
-      if (!validate()) return;
-      if (!confirm('Submit this update for editor review? The current published version will remain live until approved.')) return;
-      const data = getFormData();
-      submitUpdateBtn.disabled = true;
-      submitUpdateBtn.textContent = 'Submitting...';
-      try {
-        const res = await fetch(`/reporter/articles/${ARTICLE_ID}/submit-update`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
+  function lock(value) {
+    busy = value;
+    for (const k of fields) {
+      document.getElementById(k).disabled =
+        value || !editable || (k === "category" && !!id);
+    }
+    for (const key of ["save-draft-btn", "submit-btn", "submit-update-btn"]) {
+      const b = document.getElementById(key);
+      if (b) b.disabled = value;
+    }
+  }
+  async function act(kind) {
+    if (busy || !editable) return;
+    const snapshot = data();
+    if (
+      kind !== "save" &&
+      ["title", "summary", "content"].some((k) => !snapshot[k].trim())
+    ) {
+      showError(new Error("Title, summary and content are required."));
+      return;
+    }
+    if (kind !== "save" && !confirm("Submit this content for editor review?"))
+      return;
+    clearTimeout(timer);
+    lock(true);
+    try {
+      await enqueue(async () => {
+        await ensureId(snapshot);
+        await api(`/reporter/articles/${id}/${kind}`, {
+          ...snapshot,
+          revision,
         });
-        const result = await res.json();
-        if (!res.ok) { showError(result.error || 'Failed.'); return; }
-        window.location.href = '/reporter';
-      } catch (e) {
-        showError('Network error.');
-      } finally {
-        submitUpdateBtn.disabled = false;
-        submitUpdateBtn.textContent = 'Submit Update for Review';
-      }
-    });
+        acknowledge(snapshot);
+      });
+      error.classList.add("hidden");
+      if (kind !== "save") window.location.href = "/reporter";
+    } catch (e) {
+      failed(e);
+    } finally {
+      lock(false);
+    }
   }
-
-  // Warn before leaving with unsaved changes
-  let isDirty = false;
-  ['title', 'content', 'summary', 'image'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('input', () => { isDirty = true; });
+  for (const [button, kind] of [
+    ["save-draft-btn", "save"],
+    ["submit-btn", "submit"],
+    ["submit-update-btn", "submit-update"],
+  ]) {
+    const el = document.getElementById(button);
+    if (el) el.addEventListener("click", () => act(kind));
+  }
+  document.querySelectorAll("a[href]").forEach((link) =>
+    link.addEventListener("click", async (e) => {
+      if (
+        !dirty ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.shiftKey ||
+        e.altKey ||
+        link.target === "_blank"
+      )
+        return;
+      e.preventDefault();
+      if (busy) return;
+      lock(true);
+      try {
+        await flush();
+        window.location.href = link.href;
+      } catch (err) {
+        failed(err);
+      } finally {
+        lock(false);
+      }
+    }),
+  );
+  window.addEventListener("beforeunload", (e) => {
+    if (dirty) {
+      backup();
+      e.preventDefault();
+      e.returnValue = "";
+    }
   });
-  window.addEventListener('beforeunload', e => {
-    if (isDirty) { e.preventDefault(); e.returnValue = ''; }
+  window.addEventListener("pagehide", () => {
+    if (dirty) {
+      backup();
+      flush(true).catch(failed);
+    }
   });
-  document.querySelectorAll('.btn').forEach(btn => {
-    btn.addEventListener('click', () => { isDirty = false; });
-  });
+  if (dirty) timer = setTimeout(() => flush().catch(failed), 350);
 })();

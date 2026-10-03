@@ -34,6 +34,8 @@ Before the first run, populate the database with 500+ demo articles, users, and 
 npm run seed
 ```
 
+> ⚠️ **WARNING:** seeding **deletes all existing data** in the target database before inserting the demo data. The script asks for confirmation; pass `--yes` to skip the prompt.
+
 **Demo login credentials:**
 
 | Role | Username | Password |

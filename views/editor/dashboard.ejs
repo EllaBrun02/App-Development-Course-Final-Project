@@ -1,23 +1,27 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Editor Dashboard';
   extraScripts = '<script src="/js/editor.js"></script>';
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="dashboard-page">
   <div class="dashboard-header">
     <h1>Editor Dashboard</h1>
+    <a class="btn btn-outline" href="/editor/manage">Data management</a>
   </div>
 
   <form class="filter-form" method="GET" action="/editor">
-    <select name="status" class="filter-select">
+    <label class="sr-only" for="article-search">Search articles</label>
+    <input class="filter-select" id="article-search" name="search" type="search" maxlength="200" placeholder="Search articles" value="<%= search %>">
+    <select aria-label="Filter by status" name="status" class="filter-select">
       <option value="">All Statuses</option>
       <option value="draft" <%= filterStatus === 'draft' ? 'selected' : '' %>>Draft</option>
       <option value="pending" <%= filterStatus === 'pending' ? 'selected' : '' %>>Pending Review</option>
       <option value="published" <%= filterStatus === 'published' ? 'selected' : '' %>>Published</option>
       <option value="returned" <%= filterStatus === 'returned' ? 'selected' : '' %>>Returned</option>
     </select>
-    <select name="category" class="filter-select">
+    <select aria-label="Filter by category" name="category" class="filter-select">
       <option value="">All Categories</option>
       <% categories.forEach(cat => { %>
         <option value="<%= cat %>" <%= filterCategory === cat ? 'selected' : '' %>><%= cat %></option>
@@ -68,6 +72,9 @@
               </td>
               <td class="col-actions">
                 <a href="/editor/articles/<%= a._id %>" class="btn btn-sm btn-outline">Review</a>
+                <% if (a.status !== 'published' || a.pendingUpdate?.status === 'pending') { %>
+                  <a href="/editor/articles/<%= a._id %>/edit" class="btn btn-sm btn-outline">Edit</a>
+                <% } %>
                 <% if (a.status === 'published') { %>
                   <a href="/article/<%= a._id %>" class="btn btn-sm btn-outline">View Live</a>
                   <a href="/editor/analytics/<%= a._id %>" class="btn btn-sm btn-analytics">Analytics</a>
@@ -79,7 +86,27 @@
         </tbody>
       </table>
     </div>
+
+    <%# Audit #28: dashboard is paginated on the server (50 per page) %>
+    <% if (totalPages > 1) { %>
+      <%
+        const baseParams = [];
+        if (typeof search !== 'undefined' && search) baseParams.push('search=' + encodeURIComponent(search));
+        if (filterStatus) baseParams.push('status=' + encodeURIComponent(filterStatus));
+        if (filterCategory) baseParams.push('category=' + encodeURIComponent(filterCategory));
+        const pageUrl = (p) => '/editor?' + baseParams.concat('page=' + p).join('&');
+      %>
+      <nav class="pagination" aria-label="Dashboard pages">
+        <% if (page > 1) { %>
+          <a href="<%= pageUrl(page - 1) %>" class="btn btn-sm btn-outline">&larr; Previous</a>
+        <% } %>
+        <span class="pagination-info">Page <%= page %> of <%= totalPages %> (<%= totalCount %> articles)</span>
+        <% if (page < totalPages) { %>
+          <a href="<%= pageUrl(page + 1) %>" class="btn btn-sm btn-outline">Next &rarr;</a>
+        <% } %>
+      </nav>
+    <% } %>
   <% } %>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>

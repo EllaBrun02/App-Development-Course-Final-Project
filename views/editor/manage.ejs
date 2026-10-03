@@ -1,0 +1,12 @@
+<% let pageTitle='Data management',extraHead='',extraScripts='<script src="/js/management.js"></script>'; %>
+<%- include('../partials/header',{pageTitle,extraHead}) %>
+<div class="dashboard-page management-page">
+ <h1>Data management</h1><p>Editor access only. Changes to view records update article totals.</p>
+ <a href="/editor">Back to dashboard</a>
+ <div class="form-group"><label for="resource">Manage</label><select id="resource"><option value="users">Users</option><option value="comments">Comments</option><option value="viewstats">View records</option></select></div>
+ <form id="search-form" class="management-search"><div class="form-group"><label for="search">Search (article ID for view records)</label><input id="search" type="search"></div><button class="btn" type="submit">Search</button></form>
+ <p id="management-message" role="status"></p><ul id="record-list"></ul>
+ <div class="management-actions"><button id="previous" class="btn" disabled>Previous</button><button id="next" class="btn" disabled>Next</button><button id="new-record" class="btn">New record</button></div>
+ <h2 id="form-heading">New record</h2><form id="record-form"><div id="record-fields"></div><button class="btn btn-primary" type="submit">Save</button></form>
+</div>
+<%- include('../partials/footer',{extraScripts}) %>
