@@ -36,7 +36,7 @@ mongod
 
 ## 3. Project npm Dependencies
 
-These are installed automatically by `npm install`. Listed here for reference:
+These are installed from the lockfile by `npm ci`. Listed here for reference:
 
 | Package | Version | Purpose |
 |---|---|---|
@@ -69,7 +69,7 @@ Open a terminal in the project root folder (the folder containing `package.json`
 
 **Step 1 — Install all npm packages:**
 ```bash
-npm install
+npm ci
 ```
 
 **Step 2 — Seed the database with demo data:**
@@ -80,9 +80,11 @@ npm run seed
 
 This creates:
 - 500 articles in various states
-- 1 editor user + 5 reporter users
+- 2 editor users + 5 reporter users
 - Comments on articles
 - 30 days of view statistics
+
+For an existing database, use `npm run demo:updates` instead of seeding to add three update-history examples without clearing data. A reporter account must already exist. Run setup and startup with the same `MONGO_URI`; the default database and the local `ella_daily_web` database are different.
 
 **Step 3 — Start the server:**
 ```bash
@@ -114,6 +116,10 @@ By default the app runs with sensible defaults. You can override them by setting
 | `PORT` | `3000` | Port the server listens on |
 | `MONGO_URI` | `mongodb://localhost:27017/the-daily-web` | MongoDB connection string |
 | `SESSION_SECRET` | auto-generated, stored in `config/session-secret.key` (gitignored) | Secret key for signing sessions |
+
+Retain the generated local secret across restarts. If running several instances, supply the same `SESSION_SECRET` and database to each instance so sessions and the persistent comment limiter use the same identifiers.
+
+Verification scripts, `node_modules`, logs and local secrets are not included in the submitted source. See README for the source ZIP command and folder/feature overview.
 
 To set them temporarily (PowerShell):
 ```powershell

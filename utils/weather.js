@@ -2,9 +2,10 @@ const fetch = require('node-fetch');
 const logger = require('./logger');
 
 let cache = null;
-let cacheTime = 0;
 let inFlight = null; // audit #27: shared refresh promise
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes — the max allowed data age
+let retryAt = 0;
+const RETRY_DELAY = 60 * 1000;
 
 // Uses Open-Meteo API — completely free, no API key required
 // Default location: Tel Aviv, Israel
@@ -33,15 +34,26 @@ function getWeatherIcon(code) {
 
 const UNAVAILABLE = () => ({
   city: CITY, temp: '--', description: 'Currently unavailable', icon: '🌤️',
-  windspeed: '--', fetchedAt: '-', stale: true,
+  windspeed: '--', fetchedAt: '-', observedAt: null, expiresAt: null, stale: true,
 });
 
 async function fetchFresh() {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true&temperature_unit=celsius`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true&temperature_unit=celsius&timezone=GMT`;
   const res = await fetch(url, { timeout: 5000 });
   if (!res.ok) throw new Error(`Status ${res.status}`);
   const data = await res.json();
   const cw = data.current_weather;
+  // Open-Meteo returns GMT timestamps without an offset when timezone=GMT.
+  // Fetching an old observation must not give it a new 15-minute lifetime.
+  const time = cw && cw.time;
+  const observed = typeof time === 'string'
+    ? Date.parse(/(?:Z|[+-]\d{2}:\d{2})$/.test(time) ? time : `${time}Z`)
+    : NaN;
+  const now = Date.now();
+  if (!Number.isFinite(observed) || observed > now || observed + CACHE_TTL <= now ||
+      !Number.isFinite(cw.temperature) || !Number.isFinite(cw.windspeed)) {
+    throw new Error('Weather observation is invalid or expired');
+  }
   cache = {
     city: CITY,
     temp: Math.round(cw.temperature),
@@ -49,32 +61,32 @@ async function fetchFresh() {
     icon: getWeatherIcon(cw.weathercode),
     windspeed: cw.windspeed,
     fetchedAt: new Date().toLocaleTimeString(),
+    observedAt: new Date(observed).toISOString(),
+    expiresAt: new Date(observed + CACHE_TTL).toISOString(),
     stale: false,
   };
-  cacheTime = Date.now();
+  retryAt = 0;
   logger.info('Weather data refreshed from Open-Meteo');
   return cache;
 }
 
 async function getWeather() {
   const now = Date.now();
-  if (cache && now - cacheTime < CACHE_TTL) return { ...cache, stale: false };
+  if (cache && now < Date.parse(cache.expiresAt)) return cache;
+  if (now < retryAt) return UNAVAILABLE();
 
   // Audit #27: when the cache is cold, share one in-flight request between
   // all concurrent callers instead of hitting the external API once each.
   if (!inFlight) {
-    inFlight = fetchFresh().finally(() => { inFlight = null; });
+    inFlight = fetchFresh().catch(err => {
+      logger.error(`Weather fetch failed: ${err.message}`);
+      cache = null;
+      retryAt = Date.now() + RETRY_DELAY;
+      return UNAVAILABLE();
+    }).finally(() => { inFlight = null; });
   }
 
-  try {
-    return await inFlight;
-  } catch (err) {
-    logger.error(`Weather fetch failed: ${err.message}`);
-    // Audit #26: never present data older than the allowed 15 minutes as
-    // current. Older cached data is flagged as stale so the UI can warn.
-    if (cache) return { ...cache, stale: true };
-    return UNAVAILABLE();
-  }
+  return inFlight;
 }
 
 module.exports = { getWeather };

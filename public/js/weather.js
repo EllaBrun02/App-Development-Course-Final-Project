@@ -1,5 +1,4 @@
-// Audit #26: a page that stays open refreshes its weather widget periodically
-// so the shown data never silently exceeds the 15-minute freshness limit.
+// Expire displayed values at the provider's observation deadline, even offline.
 (function () {
   'use strict';
 
@@ -7,10 +6,36 @@
   if (!widget) return;
 
   const REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+  let expiresAt = Date.parse(widget.dataset.expiresAt);
+  let expiryTimer;
+  let refreshing = false;
 
   function setText(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
+  }
+
+  function showUnavailable() {
+    setText('weather-temp', '--');
+    setText('weather-wind', 'Wind: --');
+    setText('weather-desc', 'Currently unavailable');
+    setText('weather-updated', '--');
+    const icon = document.getElementById('weather-icon');
+    if (icon) icon.innerHTML = '';
+    document.getElementById('weather-stale')?.classList.remove('hidden');
+  }
+
+  function scheduleExpiry() {
+    clearTimeout(expiryTimer);
+    const remaining = expiresAt - Date.now();
+    if (!Number.isFinite(remaining) || remaining <= 0) {
+      showUnavailable();
+      return;
+    }
+    expiryTimer = setTimeout(() => {
+      showUnavailable();
+      refresh();
+    }, remaining);
   }
 
   // Mirrors the icon choice in views/partials/weather.ejs so the SVG stays
@@ -32,24 +57,43 @@
   }
 
   async function refresh() {
+    if (refreshing) return;
+    refreshing = true;
     try {
-      const res = await fetch('/api/weather');
+      const res = await fetch('/api/weather', { cache: 'no-store' });
       if (!res.ok) throw new Error('weather request failed');
       const { weather } = await res.json();
+      expiresAt = Date.parse(weather.expiresAt);
+      if (weather.stale || !Number.isFinite(expiresAt) || expiresAt <= Date.now() ||
+          !Number.isFinite(weather.temp) || !Number.isFinite(weather.windspeed)) {
+        throw new Error('weather observation expired');
+      }
       const icon = document.getElementById('weather-icon');
       if (icon) icon.innerHTML = iconSvg(String(weather.description || ''));
       setText('weather-city', weather.city);
       setText('weather-temp', `${weather.temp}°C`);
       setText('weather-desc', weather.description);
       setText('weather-wind', `Wind: ${weather.windspeed} km/h`);
-      setText('weather-updated', weather.fetchedAt);
+      setText('weather-updated', new Date(weather.observedAt).toLocaleTimeString());
       const stale = document.getElementById('weather-stale');
       if (stale) stale.classList.toggle('hidden', !weather.stale);
+      scheduleExpiry();
     } catch (e) {
-      const stale = document.getElementById('weather-stale');
-      if (stale) stale.classList.remove('hidden');
+      showUnavailable();
+    } finally {
+      refreshing = false;
     }
   }
 
+  function resume() {
+    scheduleExpiry();
+    refresh();
+  }
+
+  scheduleExpiry();
   setInterval(refresh, REFRESH_MS);
+  window.addEventListener('pageshow', resume);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') resume();
+  });
 })();
