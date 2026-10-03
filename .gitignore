@@ -4,3 +4,6 @@ node_modules/
 !.env.example
 logs/*.log
 .DS_Store
+
+# Local per-machine session secret — never commit (audit #34)
+config/session-secret.key

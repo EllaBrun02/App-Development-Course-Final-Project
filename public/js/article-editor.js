@@ -26,6 +26,8 @@
   function showError(e) {
     error.textContent = e.message || String(e);
     error.classList.remove("hidden");
+    // Audit #31: move focus so screen readers announce the error
+    if (typeof error.focus === "function") error.focus();
   }
   function backup() {
     try {

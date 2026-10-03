@@ -86,6 +86,26 @@
         </tbody>
       </table>
     </div>
+
+    <%# Audit #28: dashboard is paginated on the server (50 per page) %>
+    <% if (totalPages > 1) { %>
+      <%
+        const baseParams = [];
+        if (typeof search !== 'undefined' && search) baseParams.push('search=' + encodeURIComponent(search));
+        if (filterStatus) baseParams.push('status=' + encodeURIComponent(filterStatus));
+        if (filterCategory) baseParams.push('category=' + encodeURIComponent(filterCategory));
+        const pageUrl = (p) => '/editor?' + baseParams.concat('page=' + p).join('&');
+      %>
+      <nav class="pagination" aria-label="Dashboard pages">
+        <% if (page > 1) { %>
+          <a href="<%= pageUrl(page - 1) %>" class="btn btn-sm btn-outline">&larr; Previous</a>
+        <% } %>
+        <span class="pagination-info">Page <%= page %> of <%= totalPages %> (<%= totalCount %> articles)</span>
+        <% if (page < totalPages) { %>
+          <a href="<%= pageUrl(page + 1) %>" class="btn btn-sm btn-outline">Next &rarr;</a>
+        <% } %>
+      </nav>
+    <% } %>
   <% } %>
 </div>
 
