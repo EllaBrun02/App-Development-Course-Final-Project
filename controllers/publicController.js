@@ -141,6 +141,7 @@ async function recordView(articleId) {
 exports.getWeatherData = async (req, res) => {
   try {
     const weather = await getWeather();
+    res.set('Cache-Control', 'no-store');
     res.json({ weather });
   } catch (err) {
     logger.error(`Weather API error: ${err.message}`);

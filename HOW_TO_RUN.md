@@ -13,7 +13,7 @@ By default the app connects to `mongodb://localhost:27017/the-daily-web`. If you
 
 ### Step 2 — Install dependencies (only once)
 ```
-npm install
+npm ci
 ```
 
 ### Step 3 — Seed the database (only once)
@@ -38,6 +38,34 @@ Just make sure MongoDB is running, then:
 ```
 npm start
 ```
+
+## Existing Database: Add Update Examples Without Deleting Work
+
+With the same `MONGO_URI` used by the app, run:
+
+```bash
+npm run demo:updates
+```
+
+This requires an existing reporter and adds three fictional `Demo:` articles, each with an initial publication and two approved updates. Existing records are preserved; completed examples are skipped on repeat runs. In the editor dashboard, search `Demo:`, open Analytics and select Last 7 days.
+
+For the existing database on this machine:
+
+```bash
+MONGO_URI=mongodb://127.0.0.1:27017/ella_daily_web npm run demo:updates
+PORT=3100 MONGO_URI=mongodb://127.0.0.1:27017/ella_daily_web npm start
+```
+
+PowerShell equivalents:
+
+```powershell
+$env:MONGO_URI='mongodb://127.0.0.1:27017/ella_daily_web'
+$env:PORT=3100
+npm run demo:updates
+npm start
+```
+
+Comment posting is limited to three attempts per rolling minute for both the device cookie and IP address. Users on the same network share the IP allowance, including during a group demo. The window is stored in MongoDB and expires automatically; restarting the server does not reset it.
 
 ---
 

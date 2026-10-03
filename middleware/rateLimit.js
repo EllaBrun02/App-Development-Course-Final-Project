@@ -1,21 +1,16 @@
-// Server-side rate limiter for comments: max 3 per minute per device.
-//
-// Hardened per audit #19:
-//  - The device-ID cookie is HMAC-signed, so a client cannot mint arbitrary
-//    valid IDs; a tampered/forged cookie is rejected and replaced.
-//  - The cookie is httpOnly so page scripts cannot read or rewrite it.
-//  - Deleting the cookie still yields a fresh device ID, so an additional
-//    per-IP backstop limit is enforced as a second layer. A cookie alone can
-//    never identify a device with certainty — this combination narrows the
-//    bypass without blocking legitimate users behind a shared IP too fast.
+// Three attempts in a rolling minute per signed device AND per IP address.
+// The conservative IP fallback closes cookie-reset bypasses, at the cost of
+// sharing an allowance between people on the same network. Cookies cannot
+// prove physical-device identity. MongoDB keeps windows across restarts and
+// makes simultaneous requests through different server processes atomic.
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const { getSecret } = require('../utils/secret');
+const logger = require('../utils/logger');
 
 const WINDOW_MS = 60 * 1000;
-const MAX_COMMENTS = 3;          // per device
-const MAX_PER_IP = 10;           // backstop: per IP address per minute
-
-const store = new Map(); // key -> [timestamp, ...]
+const MAX_COMMENTS = 3;
+let indexReady;
 
 const SECRET = getSecret();
 
@@ -54,39 +49,50 @@ function getDeviceId(req, res) {
   return issueDeviceId(res);
 }
 
-function recentHits(key, now) {
-  return (store.get(key) || []).filter(t => now - t < WINDOW_MS);
+async function reserveAttempt(kind, value, now) {
+  // Infrastructure collection, like the session store; no article/user data.
+  const store = mongoose.connection.collection('commentLimits');
+  if (!indexReady) {
+    indexReady = store.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
+      .catch(err => { indexReady = null; throw err; });
+  }
+  await indexReady;
+  const key = `${kind}:${sign(value)}`; // do not store raw IP addresses
+  const expiresAt = new Date(now + WINDOW_MS);
+  try {
+    await store.updateOne({ _id: key }, { $setOnInsert: { hits: [], expiresAt } }, { upsert: true });
+  } catch (err) {
+    // Another process can create the same key while this request is starting.
+    if (err.code !== 11000) throw err;
+  }
+  const recent = { $filter: { input: '$hits', as: 'hit', cond: { $gt: ['$$hit', now - WINDOW_MS] } } };
+  const result = await store.updateOne(
+    { _id: key, $expr: { $lt: [{ $size: recent }, MAX_COMMENTS] } },
+    [{ $set: { hits: { $concatArrays: [recent, [now]] }, expiresAt } }],
+  );
+  // The conditional update is atomic; a fourth concurrent claim cannot win.
+  return result.modifiedCount === 1;
 }
 
-function commentRateLimit(req, res, next) {
-  const deviceId = getDeviceId(req, res);
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  const now = Date.now();
-
-  const deviceKey = `dev:${deviceId}`;
-  const ipKey = `ip:${ip}`;
-  const deviceHits = recentHits(deviceKey, now);
-  const ipHits = recentHits(ipKey, now);
-
-  if (deviceHits.length >= MAX_COMMENTS || ipHits.length >= MAX_PER_IP) {
-    return res.status(429).json({
-      error: `Too many comments. You can post at most ${MAX_COMMENTS} comments per minute. Please wait a moment.`,
-    });
-  }
-
-  deviceHits.push(now);
-  ipHits.push(now);
-  store.set(deviceKey, deviceHits);
-  store.set(ipKey, ipHits);
-
-  // Cleanup old entries periodically
-  if (Math.random() < 0.01) {
-    for (const [key, ts] of store.entries()) {
-      if (ts.every(t => now - t >= WINDOW_MS)) store.delete(key);
+async function commentRateLimit(req, res, next) {
+  try {
+    const deviceId = getDeviceId(req, res);
+    // Express does not trust forwarded IP headers in this app.
+    const ip = (req.ip || req.socket.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+    const now = Date.now();
+    const ipAllowed = await reserveAttempt('ip', ip, now);
+    const deviceAllowed = ipAllowed && await reserveAttempt('device', deviceId, now);
+    if (!deviceAllowed) {
+      res.set('Retry-After', '60');
+      return res.status(429).json({
+        error: 'Too many comments. Please wait one minute. The limit is 3 attempts per minute per device and shared network.',
+      });
     }
+    next();
+  } catch (err) {
+    logger.error(`Comment limit unavailable: ${err.message}`);
+    res.status(503).json({ error: 'Comments are temporarily unavailable. Please try again shortly.' });
   }
-
-  next();
 }
 
 module.exports = { commentRateLimit };

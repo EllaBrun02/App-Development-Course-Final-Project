@@ -7,7 +7,7 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "seed": "node seed/seed.js",
-    "test:audit": "node tests/audit-19-38.test.js"
+    "demo:updates": "node seed/add-demo-updates.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

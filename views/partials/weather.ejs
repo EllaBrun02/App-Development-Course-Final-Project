@@ -1,4 +1,5 @@
-<div class="weather-widget" id="weather-widget">
+<% const weatherFresh = !weather.stale && Date.parse(weather.expiresAt) > Date.now(); %>
+<div class="weather-widget" id="weather-widget" data-expires-at="<%= weatherFresh ? weather.expiresAt : '' %>">
   <h3 class="widget-title">Weather</h3>
   <div class="weather-inner">
     <span class="weather-icon" id="weather-icon" aria-hidden="true">
@@ -15,14 +16,14 @@
     </span>
     <div class="weather-info">
       <div class="weather-city" id="weather-city"><%= weather.city %></div>
-      <div class="weather-temp" id="weather-temp"><%= weather.temp %>°C</div>
-      <div class="weather-desc" id="weather-desc"><%= weather.description %></div>
-      <div class="weather-wind" id="weather-wind">Wind: <%= weather.windspeed %> km/h</div>
+      <div class="weather-temp" id="weather-temp"><%= weatherFresh ? weather.temp + '°C' : '--' %></div>
+      <div class="weather-desc" id="weather-desc"><%= weatherFresh ? weather.description : 'Currently unavailable' %></div>
+      <div class="weather-wind" id="weather-wind"><%= weatherFresh ? 'Wind: ' + weather.windspeed + ' km/h' : 'Wind: --' %></div>
     </div>
   </div>
-  <div class="weather-stale <%= weather.stale ? '' : 'hidden' %>" id="weather-stale" role="status">
-    ⚠ Weather data may be out of date
+  <div class="weather-stale <%= weatherFresh ? 'hidden' : '' %>" id="weather-stale" role="status">
+    Fresh weather is unavailable. Retrying automatically.
   </div>
-  <div class="weather-updated">Updated: <span id="weather-updated"><%= weather.fetchedAt %></span></div>
+  <div class="weather-updated">Observation: <span id="weather-updated"><%= weatherFresh ? new Date(weather.observedAt).toLocaleTimeString() : '--' %></span></div>
 </div>
 <script src="/js/weather.js" defer></script>
