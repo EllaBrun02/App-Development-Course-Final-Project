@@ -1,161 +1,115 @@
 const Article = require('../models/Article');
-const logger = require('../utils/logger');
-
-exports.getDashboard = async (req, res) => {
+const v = require('../utils/validation');
+const run = (fn) => async (req, res) => {
   try {
-    const articles = await Article.find({ author: req.session.userId })
-      .select('title status category createdAt publishedAt editorNote')
-      .sort({ updatedAt: -1 });
-    res.render('reporter/dashboard', {
-      articles,
-      user: req.session.userName,
-      userRole: req.session.userRole,
-    });
+    await fn(req, res);
   } catch (err) {
-    logger.error(`Reporter dashboard error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
+    v.errorResponse(err, req, res);
   }
 };
-
-exports.getNewArticle = (req, res) => {
-  res.render('reporter/article-editor', {
-    article: null,
-    categories: Article.CATEGORIES,
-    user: req.session.userName,
-    userRole: req.session.userRole,
+const context = (req) => ({
+  user: req.session.userName,
+  userId: req.session.userId,
+  userRole: req.session.userRole,
+  categories: Article.CATEGORIES,
+});
+async function owned(req) {
+  const a = await Article.findOne({
+    _id: req.params.id,
+    author: req.session.userId,
   });
-};
-
-exports.createArticle = async (req, res) => {
-  try {
-    const { title, content, summary, image, category } = req.body;
-    if (!title || !content || !summary || !category) {
-      return res.status(400).json({ error: 'Missing required fields.' });
+  if (!a) v.bad('Article not found', 404);
+  v.revision(a, req.body);
+  return a;
+}
+function editable(a, isUpdate) {
+  if (isUpdate) {
+    if (a.status !== 'published' || a.pendingUpdate?.status === 'pending')
+      v.bad('Update cannot be edited in this state', 409);
+  } else if (!['draft', 'returned'].includes(a.status))
+    v.bad('Article cannot be edited in this state', 409);
+}
+exports.getDashboard = run(async (req, res) => {
+  const articles = await Article.find({ author: req.session.userId })
+    .select(
+      'title status category createdAt publishedAt editorNote pendingUpdate.status pendingUpdate.editorNote',
+    )
+    .sort({ updatedAt: -1, _id: -1 });
+  res.render('reporter/dashboard', { articles, ...context(req) });
+});
+exports.getNewArticle = (req, res) =>
+  res.render('reporter/article-editor', { article: null, ...context(req) });
+exports.getEditArticle = run(async (req, res) => {
+  const article = await Article.findOne({
+    _id: req.params.id,
+    author: req.session.userId,
+  });
+  if (!article) v.bad('Article not found', 404);
+  res.render('reporter/article-editor', { article, ...context(req) });
+});
+exports.createArticle = run(async (req, res) => {
+  const data = v.content(req.body);
+  const category = req.body.category || Article.CATEGORIES[0];
+  if (!Article.CATEGORIES.includes(category)) v.bad('Invalid category');
+  const draftKey = req.body.draftKey;
+  if (draftKey !== undefined && !/^[a-zA-Z0-9-]{10,80}$/.test(v.text(draftKey, 'draft key', 80)))
+    v.bad('Invalid draft key');
+  let a;
+  // Same creation retried after a lost response must return the original draft.
+  if (draftKey) a = await Article.findOne({ author: req.session.userId, draftKey });
+  if (!a) {
+    try {
+      a = await Article.create({
+        ...data,
+        category,
+        author: req.session.userId,
+        status: 'draft',
+        ...(draftKey ? { draftKey } : {}),
+      });
+    } catch (e) {
+      if (e.code !== 11000 || !draftKey) throw e;
+      a = await Article.findOne({ author: req.session.userId, draftKey });
     }
-    const article = await Article.create({
-      title, content, summary, image: image || '', category,
-      author: req.session.userId,
-      status: 'draft',
-    });
-    res.status(201).json({ id: article._id });
-  } catch (err) {
-    logger.error(`Create article error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
   }
-};
-
-exports.getEditArticle = async (req, res) => {
-  try {
-    const article = await Article.findOne({ _id: req.params.id, author: req.session.userId });
-    if (!article) return res.status(404).render('error', { message: 'Article not found', code: 404 });
-
-    res.render('reporter/article-editor', {
-      article,
-      categories: Article.CATEGORIES,
-      user: req.session.userName,
-      userRole: req.session.userRole,
-    });
-  } catch (err) {
-    logger.error(`Get edit article error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
-  }
-};
-
-// Auto-save: persists work in progress without changing status
-exports.autoSave = async (req, res) => {
-  try {
-    const { title, content, summary, image, isUpdate } = req.body;
-    const article = await Article.findOne({ _id: req.params.id, author: req.session.userId });
-    if (!article) return res.status(404).json({ error: 'Not found' });
-
-    const saveData = { title, content, summary, image: image || '', savedAt: new Date() };
-
-    if (isUpdate && article.status === 'published') {
-      // Auto-saving an update to a published article
-      if (!article.pendingUpdate) article.pendingUpdate = {};
-      article.pendingUpdate.autoSave = saveData;
-    } else {
-      // Auto-saving the main article draft
-      article.autoSave = saveData;
-    }
-    await article.save();
-    res.json({ ok: true, savedAt: saveData.savedAt });
-  } catch (err) {
-    logger.error(`Auto-save error: ${err.message}`);
-    res.status(500).json({ error: 'Auto-save failed' });
-  }
-};
-
-// Submit draft for editor review
-exports.submitForReview = async (req, res) => {
-  try {
-    const { title, content, summary, image } = req.body;
-    const article = await Article.findOne({ _id: req.params.id, author: req.session.userId });
-    if (!article) return res.status(404).json({ error: 'Not found' });
-
-    if (!['draft', 'returned'].includes(article.status)) {
-      return res.status(400).json({ error: 'Article cannot be submitted in its current state.' });
-    }
-
-    article.title = title;
-    article.content = content;
-    article.summary = summary;
-    article.image = image || '';
-    article.status = 'pending';
-    article.editorNote = '';
-    article.autoSave = undefined;
-    await article.save();
-
-    logger.info(`Article ${article._id} submitted for review by reporter ${req.session.userId}`);
-    res.json({ ok: true });
-  } catch (err) {
-    logger.error(`Submit review error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// Submit an update to an already-published article
-exports.submitUpdate = async (req, res) => {
-  try {
-    const { title, content, summary, image } = req.body;
-    const article = await Article.findOne({ _id: req.params.id, author: req.session.userId, status: 'published' });
-    if (!article) return res.status(404).json({ error: 'Not found' });
-
-    article.pendingUpdate = {
-      title, content, summary, image: image || '',
-      status: 'pending',
-      editorNote: '',
-      submittedAt: new Date(),
-      autoSave: undefined,
-    };
-    await article.save();
-
-    logger.info(`Article ${article._id} update submitted for review`);
-    res.json({ ok: true });
-  } catch (err) {
-    logger.error(`Submit update error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
-
-// Update article content and stay in draft/returned state
-exports.saveArticle = async (req, res) => {
-  try {
-    const { title, content, summary, image } = req.body;
-    const article = await Article.findOne({ _id: req.params.id, author: req.session.userId });
-    if (!article) return res.status(404).json({ error: 'Not found' });
-
-    if (!['draft', 'returned'].includes(article.status)) {
-      return res.status(400).json({ error: 'Cannot edit article in current state.' });
-    }
-    article.title = title;
-    article.content = content;
-    article.summary = summary;
-    article.image = image || '';
-    await article.save();
-    res.json({ ok: true });
-  } catch (err) {
-    logger.error(`Save article error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
-  }
-};
+  res.status(201).json({ id: a._id, revision: a.__v });
+});
+exports.autoSave = run(async (req, res) => {
+  const a = await owned(req),
+    isUpdate = v.boolean(req.body.isUpdate, 'isUpdate');
+  editable(a, isUpdate);
+  const data = { ...v.content(req.body), savedAt: new Date() };
+  if (isUpdate) a.pendingUpdate.autoSave = data;
+  else a.autoSave = data;
+  await a.save();
+  res.json({ ok: true, savedAt: data.savedAt, revision: a.__v });
+});
+exports.saveArticle = run(async (req, res) => {
+  const a = await owned(req);
+  editable(a, false);
+  Object.assign(a, v.content(req.body, a.status === 'returned'));
+  a.autoSave = undefined;
+  await a.save();
+  res.json({ ok: true, revision: a.__v });
+});
+exports.submitForReview = run(async (req, res) => {
+  const a = await owned(req);
+  editable(a, false);
+  Object.assign(a, v.content(req.body, true));
+  a.status = 'pending';
+  a.editorNote = '';
+  a.autoSave = undefined;
+  await a.save();
+  res.json({ ok: true, revision: a.__v });
+});
+exports.submitUpdate = run(async (req, res) => {
+  const a = await owned(req);
+  editable(a, true);
+  a.pendingUpdate = {
+    ...v.content(req.body, true),
+    status: 'pending',
+    editorNote: '',
+    submittedAt: new Date(),
+  };
+  await a.save();
+  res.json({ ok: true, revision: a.__v });
+});

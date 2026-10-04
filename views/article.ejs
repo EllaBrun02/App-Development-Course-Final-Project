@@ -1,9 +1,10 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = article.title;
   extraHead = '<link rel="stylesheet" href="/css/article.css">';
   extraScripts = '<script src="/js/article.js"></script>';
 %>
-<%- include('partials/header') %>
+<%- include('partials/header', { pageTitle, extraHead }) %>
 
 <div class="content-with-sidebar">
   <main class="main-content">
@@ -24,7 +25,7 @@
 
       <% if (article.image) { %>
         <figure class="article-hero">
-          <img src="<%= article.image %>" alt="<%= article.title %>" loading="lazy" />
+          <img src="<%= article.image %>" alt="<%= article.title %>" data-image-fallback />
         </figure>
       <% } %>
 
@@ -32,9 +33,7 @@
         <p><%= article.summary %></p>
       </div>
 
-      <div class="article-body" itemprop="articleBody">
-        <%- article.content.replace(/\n/g, '<br>') %>
-      </div>
+      <div class="article-body" itemprop="articleBody"><%= article.content %></div>
     </article>
 
     <section class="comments-section" id="comments">
@@ -62,7 +61,7 @@
           <label for="comment-body">Comment</label>
           <textarea id="comment-body" name="body" rows="4" maxlength="1000" required placeholder="Write your comment..."></textarea>
         </div>
-        <div id="comment-error" class="error-message hidden"></div>
+        <div id="comment-error" class="error-message hidden" role="alert" tabindex="-1"></div>
         <button type="submit" class="btn btn-primary">Post Comment</button>
       </form>
     </section>
@@ -73,4 +72,4 @@
   </aside>
 </div>
 
-<%- include('partials/footer') %>
+<%- include('partials/footer', { extraScripts }) %>

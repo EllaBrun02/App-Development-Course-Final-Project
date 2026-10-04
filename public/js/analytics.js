@@ -4,7 +4,12 @@
   const ARTICLE_ID = window.ARTICLE_ID;
   const chartLoading = document.getElementById('chart-loading');
   const timeRangeSelect = document.getElementById('time-range');
+  const totalViewsStat = document.getElementById('total-views-stat');
   let chart = null;
+  let requestId = 0;
+  let activeRequest = null;
+
+  const HOUR_MS = 3600 * 1000;
 
   function getHoursAgo(range) {
     if (range === '24h') return 24;
@@ -13,79 +18,145 @@
     return null; // all
   }
 
+  function truncToHour(date) {
+    const d = new Date(date);
+    d.setMinutes(0, 0, 0);
+    return d;
+  }
+
+  // The x axis must represent real time. We build a continuous
+  // hourly series (missing hours filled with 0 views) so equal distances on
+  // the axis always mean equal time, and quiet hours show as zero.
+  function buildHourlySeries(stats, cutoff) {
+    const byHour = new Map();
+    stats.forEach(s => {
+      byHour.set(truncToHour(s.hour).getTime(), s);
+    });
+
+    const times = [...byHour.keys()].sort((a, b) => a - b);
+    if (times.length === 0) return [];
+
+    const start = cutoff ? Math.max(times[0], truncToHour(cutoff).getTime()) : times[0];
+    const end = truncToHour(new Date()).getTime();
+
+    const series = [];
+    for (let t = start; t <= end; t += HOUR_MS) {
+      const s = byHour.get(t);
+      series.push({
+        time: t,
+        count: s ? s.count : 0,
+        publishEvents: s && s.publishEvents ? s.publishEvents : [],
+      });
+    }
+    return series;
+  }
+
+  function formatHour(t) {
+    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
   async function loadAndRender() {
+    const id = ++requestId;
+    if (activeRequest) activeRequest.abort();
+    activeRequest = new AbortController();
+    const range = timeRangeSelect.value;
+    chartLoading.textContent = 'Loading chart data…';
     chartLoading.classList.remove('hidden');
+    chartLoading.textContent = 'Loading chart data...';
     try {
-      const res = await fetch(`/editor/api/analytics/${ARTICLE_ID}`);
+      const hoursAgo = getHoursAgo(range);
+
+      // Ask the server only for the selected range
+      const url = `/editor/api/analytics/${ARTICLE_ID}` + (hoursAgo ? `?hours=${hoursAgo}` : '');
+      const res = await fetch(url, { signal: activeRequest.signal });
       if (!res.ok) throw new Error('Failed to load analytics');
       const { stats } = await res.json();
 
-      const range = timeRangeSelect.value;
-      const hoursAgo = getHoursAgo(range);
-      const cutoff = hoursAgo ? new Date(Date.now() - hoursAgo * 3600 * 1000) : null;
+      if (id !== requestId) return;
+      const cutoff = hoursAgo ? new Date(Date.now() - hoursAgo * HOUR_MS) : null;
 
-      const filtered = cutoff
-        ? stats.filter(s => new Date(s.hour) >= cutoff)
-        : stats;
+      // Update total views (all-time sum — only when the full history was fetched)
+      if (totalViewsStat && !hoursAgo) {
+        totalViewsStat.textContent = stats.reduce((sum, st) => sum + (st.count || 0), 0);
+      }
 
-      const labels = filtered.map(s => {
-        const d = new Date(s.hour);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-      });
-      const counts = filtered.map(s => s.count);
+      // Continuous hourly series — equal spacing means equal time
+      const series = buildHourlySeries(stats, cutoff);
 
-      // Collect publish event timestamps
+      if (series.length === 0) {
+        chartLoading.textContent = 'No view data for the selected time range.';
+        if (chart) { chart.destroy(); chart = null; }
+        return;
+      }
+
+      const labels = series.map(s => formatHour(s.time));
+      const counts = series.map(s => s.count);
+
+      // Publish/update markers. Several events in the same hour
+      // are kept distinct — the marker label carries the count and the
+      // tooltip lists every event time.
       const publishPoints = [];
-      filtered.forEach((s, idx) => {
-        if (s.publishEvents && s.publishEvents.length > 0) {
-          publishPoints.push({ idx, label: labels[idx], events: s.publishEvents });
+      series.forEach((s, idx) => {
+        if (s.publishEvents.length > 0) {
+          publishPoints.push({ idx, events: s.publishEvents });
         }
-      });
-
-      // Build vertical-line annotations for publish events
-      const annotations = {};
-      publishPoints.forEach((p, i) => {
-        annotations[`pub_${i}`] = {
-          type: 'line',
-          xMin: p.idx,
-          xMax: p.idx,
-          borderColor: '#E74C3C',
-          borderWidth: 2,
-          borderDash: [4, 4],
-          label: {
-            content: '📢 Published',
-            enabled: true,
-            position: 'start',
-            backgroundColor: '#E74C3C',
-            color: '#fff',
-            font: { size: 11, family: 'Arial' },
-          },
-        };
       });
 
       if (chart) chart.destroy();
 
+      // The marker plugin is passed per chart instance (never
+      // registered globally), and reads its points from the chart's own
+      // config — so switching the time range can never leave lines drawn
+      // at positions belonging to the previous range.
+      const publishPlugin = {
+        id: 'publishLines',
+        afterDraw(c) {
+          const points = c.config.options.publishPoints || [];
+          const ctx = c.ctx;
+          points.forEach(p => {
+            const x = c.scales.x.getPixelForValue(p.idx);
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = '#b45b3d';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, c.scales.y.top);
+            ctx.lineTo(x, c.scales.y.bottom);
+            ctx.stroke();
+            if (p.events.length > 1) {
+              ctx.fillStyle = '#b45b3d';
+              ctx.font = '11px Arial';
+              ctx.fillText(`×${p.events.length}`, x + 4, c.scales.y.top + 12);
+            }
+            ctx.restore();
+          });
+        },
+      };
+
       const ctx = document.getElementById('views-chart').getContext('2d');
       chart = new Chart(ctx, {
         type: 'line',
+        plugins: [publishPlugin],
         data: {
           labels,
           datasets: [{
             label: 'Views per hour',
             data: counts,
-            borderColor: '#4A90D9',
-            backgroundColor: 'rgba(74,144,217,0.12)',
+            borderColor: '#6535b5',
+            backgroundColor: 'rgba(101,53,181,0.1)',
             fill: true,
             tension: 0.3,
             pointRadius: counts.map((_, i) => publishPoints.some(p => p.idx === i) ? 6 : 2),
             pointBackgroundColor: counts.map((_, i) =>
-              publishPoints.some(p => p.idx === i) ? '#E74C3C' : '#4A90D9'
+              publishPoints.some(p => p.idx === i) ? '#b45b3d' : '#6535b5'
             ),
           }],
         },
         options: {
+          animation: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : undefined,
+          publishPoints,
           responsive: true,
-          maintainAspectRatio: true,
+          maintainAspectRatio: false,
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -93,7 +164,10 @@
                 afterBody: (items) => {
                   const idx = items[0].dataIndex;
                   const hit = publishPoints.find(p => p.idx === idx);
-                  return hit ? ['', '📢 Article published/updated here'] : [];
+                  if (!hit) return [];
+                  return ['', '📢 Published/updated here:'].concat(
+                    hit.events.map(e => '  ' + new Date(e).toLocaleString())
+                  );
                 },
               },
             },
@@ -121,31 +195,10 @@
         },
       });
 
-      // Draw publish event lines manually as chartjs plugin
-      const publishPlugin = {
-        id: 'publishLines',
-        afterDraw(chart) {
-          const ctx = chart.ctx;
-          publishPoints.forEach(p => {
-            const x = chart.scales.x.getPixelForValue(p.idx);
-            const topY = chart.scales.y.top;
-            const bottomY = chart.scales.y.bottom;
-            ctx.save();
-            ctx.setLineDash([4, 4]);
-            ctx.strokeStyle = '#E74C3C';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(x, topY);
-            ctx.lineTo(x, bottomY);
-            ctx.stroke();
-            ctx.restore();
-          });
-        },
-      };
-      Chart.register(publishPlugin);
-
       chartLoading.classList.add('hidden');
     } catch (err) {
+      if (id !== requestId || err.name === 'AbortError') return;
+      if (chart) { chart.destroy(); chart = null; }
       chartLoading.textContent = 'Failed to load analytics data.';
     }
   }

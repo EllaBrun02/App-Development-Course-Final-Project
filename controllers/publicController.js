@@ -3,41 +3,46 @@ const Comment = require('../models/Comment');
 const ViewStat = require('../models/ViewStat');
 const { getWeather } = require('../utils/weather');
 const logger = require('../utils/logger');
+const v = require('../utils/validation');
 
 const PAGE_SIZE = 20;
 
-exports.getHome = async (req, res) => {
+exports.getHome = (req, res) => {
   try {
-    const weather = await getWeather();
     res.render('index', {
-      weather,
+      weather: getWeather(),
       categories: Article.CATEGORIES,
       user: req.session.userName || null,
       userRole: req.session.userRole || null,
     });
   } catch (err) {
     logger.error(`Home page error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
+    v.errorResponse(err, req, res);
   }
 };
 
 // API: paginated published articles with search/filter/sort
 exports.getArticles = async (req, res) => {
   try {
-    const { page = 1, search, category, sort = 'date', viewed } = req.query;
+    const { page = '1', search, category, sort = 'date', viewed } = req.query;
     const query = { status: 'published' };
+    const pageNumber = v.page(page);
+    if (search !== undefined) v.text(search, 'search', 200);
+    if (category && !Article.CATEGORIES.includes(category)) v.bad('Invalid category');
+    if (!['date', 'popularity'].includes(sort)) v.bad('Invalid sort');
+    if (viewed && !['viewed', 'unviewed'].includes(viewed)) v.bad('Invalid viewed filter');
 
     if (search) {
       query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { summary: { $regex: search, $options: 'i' } },
+        { title: { $regex: v.literal(search), $options: 'i' } },
+        { summary: { $regex: v.literal(search), $options: 'i' } },
       ];
     }
-    if (category && Article.CATEGORIES.includes(category)) {
+    if (category) {
       query.category = category;
     }
 
-    // viewed/not-viewed filter uses session-stored set of viewed article IDs
+    // Reading history belongs to the current visitor, not all site readers.
     const viewedIds = req.session.viewedArticles || [];
     if (viewed === 'viewed') {
       query._id = { $in: viewedIds };
@@ -45,9 +50,9 @@ exports.getArticles = async (req, res) => {
       query._id = { $nin: viewedIds };
     }
 
-    const sortOption = sort === 'popularity' ? { views: -1 } : { publishedAt: -1 };
+    const sortOption = sort === 'popularity' ? { views: -1, _id: -1 } : { publishedAt: -1, _id: -1 };
 
-    const skip = (parseInt(page) - 1) * PAGE_SIZE;
+    const skip = (pageNumber - 1) * PAGE_SIZE;
     const articles = await Article.find(query)
       .select('title summary image category author publishedAt views')
       .populate('author', 'name')
@@ -61,7 +66,7 @@ exports.getArticles = async (req, res) => {
     res.json({ articles, hasMore });
   } catch (err) {
     logger.error(`Articles API error: ${err.message}`);
-    res.status(500).json({ error: 'Server error' });
+    v.errorResponse(err, req, res);
   }
 };
 
@@ -71,10 +76,9 @@ exports.getArticlePage = async (req, res) => {
       .populate('author', 'name');
     if (!article) return res.status(404).render('error', { message: 'Article not found', code: 404 });
 
-    // Record view
-    await recordView(article._id);
-    article.views += 1;
-    await Article.updateOne({ _id: article._id }, { $inc: { views: 1 } });
+    // Every visit counts as a view (hourly bucket + article total)
+    const recorded = await recordView(article._id);
+    if (recorded) article.views += 1;
 
     // Track in session for viewed/unviewed filter
     if (!req.session.viewedArticles) req.session.viewedArticles = [];
@@ -84,22 +88,25 @@ exports.getArticlePage = async (req, res) => {
     }
 
     const comments = await Comment.find({ article: article._id }).sort({ createdAt: 1 });
-    const weather = await getWeather();
 
     res.render('article', {
       article,
       comments,
-      weather,
+      weather: getWeather(),
       categories: Article.CATEGORIES,
       user: req.session.userName || null,
       userRole: req.session.userRole || null,
     });
   } catch (err) {
     logger.error(`Article page error: ${err.message}`);
-    res.status(500).render('error', { message: 'Server error', code: 500 });
+    v.errorResponse(err, req, res);
   }
 };
 
+// The two related writes (hourly bucket + total counter) are not atomic in
+// MongoDB without transactions. We order them and compensate: the bucket is
+// incremented first; if the total-counter update then fails, the bucket
+// increment is rolled back so the two numbers stay consistent.
 async function recordView(articleId) {
   const now = new Date();
   const hour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
@@ -111,5 +118,25 @@ async function recordView(articleId) {
     );
   } catch (err) {
     logger.error(`ViewStat update error: ${err.message}`);
+    return false; // stats not recorded — don't bump the total counter either
+  }
+  try {
+    await Article.updateOne({ _id: articleId }, { $inc: { views: 1 } });
+    return true;
+  } catch (err) {
+    logger.error(`Article views counter update error: ${err.message} — rolling back stat increment`);
+    try {
+      await ViewStat.updateOne({ article: articleId, hour }, { $inc: { count: -1 } });
+    } catch (rollbackErr) {
+      logger.error(`ViewStat rollback failed (data may be inconsistent): ${rollbackErr.message}`);
+    }
+    return false;
   }
 }
+
+// API endpoint so an open page can refresh its weather widget.
+// Served from the shared server cache, so it never calls the provider directly.
+exports.getWeatherData = (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ weather: getWeather() });
+};

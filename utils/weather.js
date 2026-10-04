@@ -1,15 +1,19 @@
-const fetch = require('node-fetch');
 const logger = require('./logger');
 
-let cache = null;
-let cacheTime = 0;
-const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
-
-// Uses Open-Meteo API — completely free, no API key required
-// Default location: Tel Aviv, Israel
+// Uses Open-Meteo — free, no API key and no credit card required.
+// Default location: Tel Aviv, Israel.
 const LAT = 32.0853;
 const LON = 34.7818;
 const CITY = 'Tel Aviv';
+const API_URL = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true&temperature_unit=celsius&timezone=GMT`;
+
+const MAX_AGE = 15 * 60 * 1000; // displayed weather may lag at most 15 minutes
+const NEXT_OBSERVATION_DELAY = 2 * 1000; // ask for the next observation just after this one expires
+const RETRY_DELAY = 10 * 1000; // after a failure, try again soon (one request for all visitors)
+const REQUEST_TIMEOUT = 5 * 1000;
+
+let cache = null; // the latest valid observation, shared by all visitors
+let started = false;
 
 const WMO_CODES = {
   0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
@@ -19,43 +23,66 @@ const WMO_CODES = {
   95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Thunderstorm with heavy hail',
 };
 
-function getWeatherIcon(code) {
-  if (code === 0 || code === 1) return '☀️';
-  if (code === 2 || code === 3) return '⛅';
-  if (code >= 45 && code <= 48) return '🌫️';
-  if (code >= 51 && code <= 67) return '🌧️';
-  if (code >= 71 && code <= 77) return '❄️';
-  if (code >= 80 && code <= 82) return '🌦️';
-  if (code >= 95) return '⛈️';
-  return '🌤️';
+const UNAVAILABLE = () => ({
+  city: CITY, temp: '--', description: 'Currently unavailable', windspeed: '--',
+  observedAt: null, expiresAt: null, stale: true,
+});
+
+async function fetchObservation() {
+  const res = await fetch(API_URL, { signal: AbortSignal.timeout(REQUEST_TIMEOUT) });
+  if (!res.ok) throw new Error(`Status ${res.status}`);
+  const data = await res.json();
+  const cw = data.current_weather;
+  // Open-Meteo returns GMT timestamps without an offset when timezone=GMT.
+  // Freshness is measured from the observation time, not from our request,
+  // so an old observation never gets a new 15-minute lifetime.
+  const time = cw && cw.time;
+  const observed = typeof time === 'string'
+    ? Date.parse(/(?:Z|[+-]\d{2}:\d{2})$/.test(time) ? time : `${time}Z`)
+    : NaN;
+  const now = Date.now();
+  if (!Number.isFinite(observed) || observed > now || observed + MAX_AGE <= now ||
+      !Number.isFinite(cw.temperature) || !Number.isFinite(cw.windspeed)) {
+    throw new Error('Weather observation is invalid or expired');
+  }
+  return {
+    city: CITY,
+    temp: Math.round(cw.temperature),
+    description: WMO_CODES[cw.weathercode] || 'Unknown',
+    windspeed: cw.windspeed,
+    observedAt: new Date(observed).toISOString(),
+    expiresAt: new Date(observed + MAX_AGE).toISOString(),
+    stale: false,
+  };
 }
 
-async function getWeather() {
-  const now = Date.now();
-  if (cache && now - cacheTime < CACHE_TTL) return cache;
-
+// A single background loop keeps the cache up to date. Visitors only read the
+// cache, so page loads never wait for the provider, and thousands of visitors
+// still cause just one provider request every 15 minutes.
+async function refresh() {
+  let delay;
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current_weather=true&temperature_unit=celsius`;
-    const res = await fetch(url, { timeout: 5000 });
-    if (!res.ok) throw new Error(`Status ${res.status}`);
-    const data = await res.json();
-    const cw = data.current_weather;
-    cache = {
-      city: CITY,
-      temp: Math.round(cw.temperature),
-      description: WMO_CODES[cw.weathercode] || 'Unknown',
-      icon: getWeatherIcon(cw.weathercode),
-      windspeed: cw.windspeed,
-      fetchedAt: new Date().toLocaleTimeString(),
-    };
-    cacheTime = now;
+    cache = await fetchObservation();
     logger.info('Weather data refreshed from Open-Meteo');
+    // The provider publishes a new observation every 15 minutes, when this one expires.
+    delay = Date.parse(cache.expiresAt) - Date.now() + NEXT_OBSERVATION_DELAY;
   } catch (err) {
     logger.error(`Weather fetch failed: ${err.message}`);
-    if (cache) return cache; // serve stale cache on error
-    cache = { city: CITY, temp: '--', description: 'Unavailable', icon: '🌤️', windspeed: '--', fetchedAt: '-' };
+    delay = RETRY_DELAY;
   }
-  return cache;
+  setTimeout(refresh, Math.max(delay, 1000)).unref(); // the timer alone should not keep the process alive
 }
 
-module.exports = { getWeather };
+function startWeatherUpdates() {
+  if (started) return;
+  started = true;
+  refresh();
+}
+
+// The cached observation, but only while it is at most 15 minutes old.
+function getWeather() {
+  if (cache && Date.now() < Date.parse(cache.expiresAt)) return cache;
+  return UNAVAILABLE();
+}
+
+module.exports = { getWeather, startWeatherUpdates };

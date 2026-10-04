@@ -1,34 +1,59 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Review: ' + article.title;
-  const hasUpdate = article.pendingUpdate && article.pendingUpdate.status === 'pending';
+  const hasUpdate = !!(article.pendingUpdate && article.pendingUpdate.status === 'pending');
   extraScripts = `<script>
     window.ARTICLE_ID = ${JSON.stringify(article._id.toString())};
     window.HAS_UPDATE = ${hasUpdate};
-    window.ARTICLE_STATUS = ${JSON.stringify(article.status)};
   </script>
   <script src="/js/editor-review.js"></script>`;
+
+  // Compare the published version with the pending update field by field,
+  // so the editor can see what changed without any client-side library.
+  const compareFields = [['title', 'Title'], ['summary', 'Summary'], ['content', 'Content'], ['image', 'Image']];
+  const changedFields = hasUpdate
+    ? compareFields.filter(([key]) => (article[key] || '') !== (article.pendingUpdate[key] || ''))
+    : [];
+  const isChanged = (key) => changedFields.some(([changedKey]) => changedKey === key);
+  const editLabel = hasUpdate ? 'Edit Pending Update' : article.status === 'published' ? 'Edit Published Article' : 'Edit Article';
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="review-page">
   <div class="dashboard-header">
     <h1>Article Review</h1>
-    <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
+    <div class="header-actions">
+      <a href="/editor/articles/<%= article._id %>/edit" class="btn btn-outline"><%= editLabel %></a>
+      <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
+    </div>
   </div>
 
   <% if (hasUpdate) { %>
+    <p class="info-banner">
+      <% if (changedFields.length) { %>
+        <strong>Changed in this update:</strong> <%= changedFields.map(([, label]) => label).join(', ') %>
+      <% } else { %>
+        <strong>No content changes:</strong> the pending update is identical to the published version.
+      <% } %>
+    </p>
     <div class="update-compare">
       <div class="version-panel">
         <div class="version-label published">Currently Published</div>
-        <h2><%= article.title %></h2>
-        <p class="summary-text"><%= article.summary %></p>
-        <div class="body-preview"><%= article.content.substring(0, 500) %>...</div>
+        <% compareFields.slice(0, 3).forEach(([key, label]) => { %>
+          <div class="diff-field-label"><%= label %></div>
+          <div class="diff-content"><%= article[key] %></div>
+        <% }); %>
+        <div class="diff-field-label">Image</div>
+        <% if (article.image) { %><img src="<%= article.image %>" alt="Published article image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %>
       </div>
       <div class="version-panel">
         <div class="version-label pending">Pending Update</div>
-        <h2><%= article.pendingUpdate.title %></h2>
-        <p class="summary-text"><%= article.pendingUpdate.summary %></p>
-        <div class="body-preview"><%= article.pendingUpdate.content.substring(0, 500) %>...</div>
+        <% compareFields.slice(0, 3).forEach(([key, label]) => { %>
+          <div class="diff-field-label"><%= label %><% if (isChanged(key)) { %> <span class="change-tag">Changed</span><% } %></div>
+          <div class="diff-content<%= isChanged(key) ? ' diff-changed' : '' %>"><%= article.pendingUpdate[key] %></div>
+        <% }); %>
+        <div class="diff-field-label">Image<% if (isChanged('image')) { %> <span class="change-tag">Changed</span><% } %></div>
+        <% if (article.pendingUpdate.image) { %><img src="<%= article.pendingUpdate.image %>" alt="Proposed article image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %>
       </div>
     </div>
     <div class="review-actions">
@@ -43,9 +68,9 @@
         <span>By: <%= article.author ? article.author.name : '—' %></span>
       </div>
       <h2 id="review-title"><%= article.title %></h2>
-      <% if (article.image) { %><img src="<%= article.image %>" alt="" class="review-image"><% } %>
+      <% if (article.image) { %><img src="<%= article.image %>" alt="" class="review-image" data-image-fallback><% } %>
       <p class="review-summary"><strong>Summary:</strong> <%= article.summary %></p>
-      <div class="review-body"><%= article.content.replace(/\n/g, '<br>') %></div>
+      <div class="review-body"><%= article.content %></div>
     </div>
 
     <% if (article.status === 'pending') { %>
@@ -65,7 +90,7 @@
     </div>
   </div>
 
-  <div id="action-message" class="action-message hidden"></div>
+  <div id="action-message" class="action-message hidden" role="status" aria-live="polite"></div>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>

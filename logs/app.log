@@ -1,8 +1,0 @@
-[2026-09-10T17:36:33.042Z] [INFO] The Daily Web server running on http://localhost:3000
-[2026-09-10T17:36:33.139Z] [INFO] MongoDB connected: localhost
-[2026-09-10T17:36:47.865Z] [INFO] Weather data refreshed from Open-Meteo
-[2026-09-10T17:38:00.750Z] [INFO] The Daily Web server running on http://localhost:3000
-[2026-09-10T17:38:00.806Z] [INFO] MongoDB connected: localhost
-[2026-09-10T17:38:18.075Z] [INFO] User reporter1 (reporter) logged in
-[2026-09-10T17:39:34.850Z] [INFO] Weather data refreshed from Open-Meteo
-[2026-09-10T17:40:04.620Z] [INFO] User editor1 (editor) logged in

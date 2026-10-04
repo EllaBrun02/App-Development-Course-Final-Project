@@ -1,25 +1,26 @@
 <%
+  let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Analytics: ' + article.title;
-  extraHead = '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>';
+  extraHead = '<script src="/vendor/chart.js/chart.umd.js"></script>';
   extraScripts = `<script>
     window.ARTICLE_ID = ${JSON.stringify(article._id.toString())};
   </script>
   <script src="/js/analytics.js"></script>`;
 %>
-<%- include('../partials/header') %>
+<%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="analytics-page">
   <div class="dashboard-header">
     <div>
       <h1>Analytics</h1>
       <h2 class="analytics-article-title"><%= article.title %></h2>
-      <p class="analytics-meta">By <%= article.author ? article.author.name : '—' %> &bull; <span class="badge"><%= article.category %></span> &bull; Total views: <strong><%= article.views %></strong></p>
+      <p class="analytics-meta">By <%= article.author ? article.author.name : '—' %> &bull; <span class="badge"><%= article.category %></span> &bull; Total views: <strong id="total-views-stat"><%= article.views %></strong></p>
     </div>
     <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
   </div>
 
   <div class="chart-controls">
-    <select id="time-range" class="filter-select">
+    <select aria-label="Analytics time range" id="time-range" class="filter-select">
       <option value="24h">Last 24 hours</option>
       <option value="7d" selected>Last 7 days</option>
       <option value="30d">Last 30 days</option>
@@ -28,15 +29,15 @@
   </div>
 
   <div class="chart-container">
-    <canvas id="views-chart"></canvas>
+    <canvas id="views-chart" role="img" aria-label="Article views over time with publication markers"></canvas>
   </div>
 
   <div class="chart-legend">
-    <span class="legend-item"><span class="legend-color" style="background:#4A90D9"></span> Views per hour</span>
-    <span class="legend-item"><span class="legend-dot" style="background:#E74C3C"></span> Article published/updated</span>
+    <span class="legend-item"><span class="legend-color" style="background:#6535b5"></span> Views per hour</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#b45b3d"></span> Article published/updated</span>
   </div>
 
-  <div id="chart-loading" class="chart-loading">Loading chart data...</div>
+  <div id="chart-loading" class="chart-loading" role="status" aria-live="polite">Loading chart data...</div>
 </div>
 
-<%- include('../partials/footer') %>
+<%- include('../partials/footer', { extraScripts }) %>

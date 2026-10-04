@@ -3,7 +3,6 @@
 
   const ARTICLE_ID = window.ARTICLE_ID;
   const HAS_UPDATE = window.HAS_UPDATE;
-  const ARTICLE_STATUS = window.ARTICLE_STATUS;
 
   const actionMsg = document.getElementById('action-message');
   const returnForm = document.getElementById('return-form');
@@ -13,7 +12,7 @@
     actionMsg.textContent = text;
     actionMsg.className = 'action-message ' + type;
     actionMsg.classList.remove('hidden');
-    actionMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    actionMsg.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   }
 
   async function apiPatch(url, body) {

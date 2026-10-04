@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+!.env.example
+logs/*.log
+.DS_Store
+tests/
+tests.zip
+
+# Local per-machine session secret — never commit
+config/session-secret.key
