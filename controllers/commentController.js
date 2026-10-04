@@ -1,16 +1,14 @@
 const Comment = require('../models/Comment');
 const Article = require('../models/Article');
 const logger = require('../utils/logger');
+const v = require('../utils/validation');
 
 exports.addComment = async (req, res) => {
   try {
     const { author, body } = req.body;
     const { id } = req.params;
-    const v = require('../utils/validation');
-    v.text(author, 'name', 50, true);
-    v.text(body, 'comment', 1000, true);
 
-    if (!author || !body) {
+    if (typeof author !== 'string' || typeof body !== 'string' || !author.trim() || !body.trim()) {
       return res.status(400).json({ error: 'Name and comment are required.' });
     }
     if (author.trim().length > 50) {
@@ -20,6 +18,7 @@ exports.addComment = async (req, res) => {
       return res.status(400).json({ error: 'Comment too long (max 1000 chars).' });
     }
 
+    // Comments are only allowed on published articles.
     const article = await Article.findOne({ _id: id, status: 'published' });
     if (!article) return res.status(404).json({ error: 'Article not found.' });
 
@@ -33,6 +32,6 @@ exports.addComment = async (req, res) => {
     res.status(201).json({ comment });
   } catch (err) {
     logger.error(`Comment error: ${err.message}`);
-    require('../utils/validation').errorResponse(err, req, res);
+    v.errorResponse(err, req, res);
   }
 };

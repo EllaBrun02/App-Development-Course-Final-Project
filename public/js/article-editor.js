@@ -1,44 +1,37 @@
 (function () {
-  "use strict";
-  const form = document.getElementById("article-form");
+  'use strict';
+  const form = document.getElementById('article-form');
   if (!form) return;
   let id = window.ARTICLE_ID,
     revision = window.ARTICLE_REVISION || 0;
   const editable = window.ARTICLE_EDITABLE !== false;
-  const status = document.getElementById("autosave-status"),
-    error = document.getElementById("form-error");
-  const fields = ["title", "summary", "content", "image", "category"];
+  const status = document.getElementById('autosave-status'),
+    error = document.getElementById('form-error');
+  const fields = ['title', 'summary', 'content', 'image', 'category'];
   let timer = null,
     dirty = false,
     busy = false,
     queue = Promise.resolve();
-  let key = `dailyweb:draft:${window.ARTICLE_USER}:${id || "new"}`;
+  let key = `dailyweb:draft:${window.ARTICLE_USER}:${id || 'new'}`;
   let draftKey = crypto.randomUUID(),
-    saved = "";
+    saved = '';
   function data() {
-    return Object.fromEntries(
-      fields.map((k) => [k, document.getElementById(k)?.value || ""]),
-    );
+    return Object.fromEntries(fields.map((k) => [k, document.getElementById(k)?.value || '']));
   }
   function message(text) {
     status.textContent = text;
   }
   function showError(e) {
     error.textContent = e.message || String(e);
-    error.classList.remove("hidden");
-    // Audit #31: move focus so screen readers announce the error
-    if (typeof error.focus === "function") error.focus();
+    error.classList.remove('hidden');
+    // Move focus so screen readers announce the error
+    if (typeof error.focus === 'function') error.focus();
   }
   function backup() {
     try {
-      localStorage.setItem(
-        key,
-        JSON.stringify({ data: data(), revision, draftKey }),
-      );
+      localStorage.setItem(key, JSON.stringify({ data: data(), revision, draftKey }));
     } catch (e) {
-      message(
-        "Not saved locally. Keep this page open until the server confirms saving.",
-      );
+      message('Not saved locally. Keep this page open until the server confirms saving.');
     }
   }
   function acknowledge(snapshot) {
@@ -50,42 +43,36 @@
         localStorage.removeItem(key);
       } catch {}
     }
-    message(dirty ? "Changes not saved yet" : "Saved to server");
-    error.classList.add("hidden");
+    message(dirty ? 'Changes not saved yet' : 'Saved to server');
+    error.classList.add('hidden');
   }
   // A local recovery copy protects the last keystrokes; acknowledged work lives on the server.
   try {
-    const cached = JSON.parse(localStorage.getItem(key) || "null");
+    const cached = JSON.parse(localStorage.getItem(key) || 'null');
     if (cached && editable) {
       if (cached.revision === revision) {
         for (const k of fields)
-          if (typeof cached.data[k] === "string")
-            document.getElementById(k).value = cached.data[k];
+          if (typeof cached.data[k] === 'string') document.getElementById(k).value = cached.data[k];
         draftKey = cached.draftKey;
         dirty = true;
-        message("Recovered unsaved work; saving to server…");
+        message('Recovered unsaved work; saving to server…');
       } else {
         showError(
           new Error(
-            "The server changed since this local draft was saved. Review the server version before restoring your local work.",
+            'The server changed since this local draft was saved. Review the server version before restoring your local work.',
           ),
         );
-        const restore = document.createElement("button");
-        restore.type = "button";
-        restore.textContent = "Restore local draft";
-        restore.addEventListener("click", () => {
-          if (
-            !confirm(
-              "Replace the displayed fields with the local recovery copy?",
-            )
-          )
-            return;
+        const restore = document.createElement('button');
+        restore.type = 'button';
+        restore.textContent = 'Restore local draft';
+        restore.addEventListener('click', () => {
+          if (!confirm('Replace the displayed fields with the local recovery copy?')) return;
           for (const k of fields)
-            if (typeof cached.data[k] === "string")
+            if (typeof cached.data[k] === 'string')
               document.getElementById(k).value = cached.data[k];
           dirty = true;
           backup();
-          message("Local work restored; saving…");
+          message('Local work restored; saving…');
           restore.remove();
           flush().catch(failed);
         });
@@ -94,17 +81,15 @@
     }
   } catch (e) {
     showError(
-      new Error(
-        "Local recovery is unavailable. Keep the page open until saving completes.",
-      ),
+      new Error('Local recovery is unavailable. Keep the page open until saving completes.'),
     );
   }
-  async function api(url, body, method = "PATCH", keepalive = false) {
+  async function api(url, body, method = 'PATCH', keepalive = false) {
     const res = await fetch(url, {
       method,
       headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
       },
       body: JSON.stringify(body),
       keepalive,
@@ -113,23 +98,19 @@
     try {
       result = await res.json();
     } catch {
-      throw new Error("Save failed. Please sign in again or retry.");
+      throw new Error('Save failed. Please sign in again or retry.');
     }
-    if (!res.ok) throw new Error(result.error || "Save failed");
+    if (!res.ok) throw new Error(result.error || 'Save failed');
     if (result.revision !== undefined) revision = result.revision;
     return result;
   }
   async function ensureId(snapshot) {
     if (id) return;
-    const category = document.getElementById("category");
+    const category = document.getElementById('category');
     category.disabled = true;
     let result;
     try {
-      result = await api(
-        "/reporter/articles",
-        { ...snapshot, draftKey },
-        "POST",
-      );
+      result = await api('/reporter/articles', { ...snapshot, draftKey }, 'POST');
     } catch (err) {
       category.disabled = busy || !editable;
       throw err;
@@ -142,8 +123,8 @@
     try {
       localStorage.removeItem(old);
     } catch {}
-    window.history.replaceState(null, "", `/reporter/articles/${id}/edit`);
-    document.getElementById("category").disabled = true;
+    window.history.replaceState(null, '', `/reporter/articles/${id}/edit`);
+    document.getElementById('category').disabled = true;
   }
   function enqueue(task) {
     const next = queue.catch(() => {}).then(task);
@@ -154,7 +135,7 @@
     dirty = true;
     backup();
     message(
-      "Auto-save failed — changes not saved to server. Retry by editing or pressing Save Draft.",
+      'Auto-save failed — changes not saved to server. Retry by editing or pressing Save Draft.',
     );
     showError(e);
   }
@@ -163,12 +144,12 @@
     return enqueue(async () => {
       if (!editable || !dirty) return;
       const snapshot = data();
-      message("Saving…");
+      message('Saving…');
       await ensureId(snapshot);
       await api(
         `/reporter/articles/${id}/autosave`,
         { ...snapshot, isUpdate: !!window.IS_PUBLISHED, revision },
-        "PATCH",
+        'PATCH',
         keepalive,
       );
       acknowledge(snapshot);
@@ -180,10 +161,10 @@
       input.disabled = true;
       continue;
     }
-    input.addEventListener("input", () => {
+    input.addEventListener('input', () => {
       dirty = true;
       backup();
-      message("Changes not saved yet");
+      message('Changes not saved yet');
       clearTimeout(timer);
       timer = setTimeout(() => flush().catch(failed), id ? 1000 : 350);
     });
@@ -191,10 +172,9 @@
   function lock(value) {
     busy = value;
     for (const k of fields) {
-      document.getElementById(k).disabled =
-        value || !editable || (k === "category" && !!id);
+      document.getElementById(k).disabled = value || !editable || (k === 'category' && !!id);
     }
-    for (const key of ["save-draft-btn", "submit-btn", "submit-update-btn"]) {
+    for (const key of ['save-draft-btn', 'submit-btn', 'submit-update-btn']) {
       const b = document.getElementById(key);
       if (b) b.disabled = value;
     }
@@ -202,15 +182,11 @@
   async function act(kind) {
     if (busy || !editable) return;
     const snapshot = data();
-    if (
-      kind !== "save" &&
-      ["title", "summary", "content"].some((k) => !snapshot[k].trim())
-    ) {
-      showError(new Error("Title, summary and content are required."));
+    if (kind !== 'save' && ['title', 'summary', 'content'].some((k) => !snapshot[k].trim())) {
+      showError(new Error('Title, summary and content are required.'));
       return;
     }
-    if (kind !== "save" && !confirm("Submit this content for editor review?"))
-      return;
+    if (kind !== 'save' && !confirm('Submit this content for editor review?')) return;
     clearTimeout(timer);
     lock(true);
     try {
@@ -222,8 +198,8 @@
         });
         acknowledge(snapshot);
       });
-      error.classList.add("hidden");
-      if (kind !== "save") window.location.href = "/reporter";
+      error.classList.add('hidden');
+      if (kind !== 'save') window.location.href = '/reporter';
     } catch (e) {
       failed(e);
     } finally {
@@ -231,23 +207,16 @@
     }
   }
   for (const [button, kind] of [
-    ["save-draft-btn", "save"],
-    ["submit-btn", "submit"],
-    ["submit-update-btn", "submit-update"],
+    ['save-draft-btn', 'save'],
+    ['submit-btn', 'submit'],
+    ['submit-update-btn', 'submit-update'],
   ]) {
     const el = document.getElementById(button);
-    if (el) el.addEventListener("click", () => act(kind));
+    if (el) el.addEventListener('click', () => act(kind));
   }
-  document.querySelectorAll("a[href]").forEach((link) =>
-    link.addEventListener("click", async (e) => {
-      if (
-        !dirty ||
-        e.ctrlKey ||
-        e.metaKey ||
-        e.shiftKey ||
-        e.altKey ||
-        link.target === "_blank"
-      )
+  document.querySelectorAll('a[href]').forEach((link) =>
+    link.addEventListener('click', async (e) => {
+      if (!dirty || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || link.target === '_blank')
         return;
       e.preventDefault();
       if (busy) return;
@@ -262,14 +231,14 @@
       }
     }),
   );
-  window.addEventListener("beforeunload", (e) => {
+  window.addEventListener('beforeunload', (e) => {
     if (dirty) {
       backup();
       e.preventDefault();
-      e.returnValue = "";
+      e.returnValue = '';
     }
   });
-  window.addEventListener("pagehide", () => {
+  window.addEventListener('pagehide', () => {
     if (dirty) {
       backup();
       flush(true).catch(failed);

@@ -7,5 +7,5 @@ logs/*.log
 tests/
 tests.zip
 
-# Local per-machine session secret — never commit (audit #34)
+# Local per-machine session secret — never commit
 config/session-secret.key

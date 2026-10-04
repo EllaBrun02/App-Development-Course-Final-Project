@@ -21,7 +21,7 @@
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
-  // Audit #31: respect Reduced Motion, and move focus to errors so
+  // Respect Reduced Motion, and move focus to errors so
   // assistive technology announces them
   function scrollBehavior() {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';

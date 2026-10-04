@@ -24,7 +24,7 @@
     return d;
   }
 
-  // Audit #22: the x axis must represent real time. We build a continuous
+  // The x axis must represent real time. We build a continuous
   // hourly series (missing hours filled with 0 views) so equal distances on
   // the axis always mean equal time, and quiet hours show as zero.
   function buildHourlySeries(stats, cutoff) {
@@ -66,7 +66,7 @@
     try {
       const hoursAgo = getHoursAgo(range);
 
-      // Audit #28: ask the server only for the selected range
+      // Ask the server only for the selected range
       const url = `/editor/api/analytics/${ARTICLE_ID}` + (hoursAgo ? `?hours=${hoursAgo}` : '');
       const res = await fetch(url, { signal: activeRequest.signal });
       if (!res.ok) throw new Error('Failed to load analytics');
@@ -80,7 +80,7 @@
         totalViewsStat.textContent = stats.reduce((sum, st) => sum + (st.count || 0), 0);
       }
 
-      // Audit #22: continuous hourly series — equal spacing means equal time
+      // Continuous hourly series — equal spacing means equal time
       const series = buildHourlySeries(stats, cutoff);
 
       if (series.length === 0) {
@@ -92,7 +92,7 @@
       const labels = series.map(s => formatHour(s.time));
       const counts = series.map(s => s.count);
 
-      // Publish/update markers. Audit #22: several events in the same hour
+      // Publish/update markers. Several events in the same hour
       // are kept distinct — the marker label carries the count and the
       // tooltip lists every event time.
       const publishPoints = [];
@@ -104,7 +104,7 @@
 
       if (chart) chart.destroy();
 
-      // Audit #21: the marker plugin is passed per chart instance (never
+      // The marker plugin is passed per chart instance (never
       // registered globally), and reads its points from the chart's own
       // config — so switching the time range can never leave lines drawn
       // at positions belonging to the previous range.

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// Session/signing secret (audit #34):
+// Session/signing secret:
 // 1. Prefer SESSION_SECRET from the environment.
 // 2. Otherwise generate a random secret once and persist it locally
 //    (config/session-secret.key, gitignored) so sessions survive restarts

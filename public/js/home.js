@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  // Audit #32: feed state (search/filter/sort) lives in the URL so that
+  // Feed state (search/filter/sort) lives in the URL so that
   // refresh, back navigation and shared links restore the same view.
   const initialParams = new URLSearchParams(window.location.search);
 
@@ -42,7 +42,7 @@
     return '/api/articles?' + params.toString();
   }
 
-  // Audit #32: reflect the current filters in the address bar
+  // Reflect the current filters in the address bar
   function syncUrl() {
     const qs = stateParams().toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
@@ -153,7 +153,7 @@
   }, { rootMargin: '300px' });
   observer.observe(document.getElementById('load-more-trigger'));
 
-  // Audit #33: an image URL that exists but fails to load falls back to the
+  // An image URL that exists but fails to load falls back to the
   // same placeholder used when there is no image at all.
   function attachImageFallbacks() {
     feed.querySelectorAll('.article-card-img img:not([data-fallback])').forEach(img => {
@@ -169,12 +169,12 @@
     document.querySelectorAll('.category-link').forEach(link => {
       link.setAttribute('aria-current', String(link.dataset.category === currentCategory));
     });
-    // Audit #32: reflect the current filters in the address bar
+    // Reflect the current filters in the address bar
     syncUrl();
     loadArticles(true);
   }
 
-  // Restore control values from the URL state (audit #32)
+  // Restore control values from the URL state
   searchInput.value = currentSearch;
   categoryFilter.value = currentCategory;
   viewedFilter.value = currentViewed;

@@ -2,14 +2,6 @@ const mongoose = require('mongoose');
 
 const CATEGORIES = ['Technology', 'Politics', 'Sports', 'Science', 'Business', 'Health', 'Entertainment', 'World'];
 
-// Sub-schema for content (reused for main and pending update)
-const contentSchema = {
-  title: String,
-  content: String,
-  summary: String,
-  image: String,
-};
-
 const articleSchema = new mongoose.Schema({
   // Published / current content
   title: { type: String, default: '', maxlength: 200, required: function () { return this.status !== 'draft'; } },
@@ -63,7 +55,7 @@ const articleSchema = new mongoose.Schema({
 articleSchema.index({ author: 1, draftKey: 1 }, { unique: true, partialFilterExpression: { draftKey: { $type: 'string' } } });
 articleSchema.index({ title: 'text', summary: 'text' });
 articleSchema.index({ status: 1, category: 1, publishedAt: -1 });
-// Audit #28: indexes matching the queries actually used —
+// Indexes matching the queries actually used —
 // popularity sort on the public feed, and the reporter dashboard listing.
 articleSchema.index({ status: 1, views: -1 });
 articleSchema.index({ author: 1, updatedAt: -1 });

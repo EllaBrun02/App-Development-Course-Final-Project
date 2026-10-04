@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
-router.param('id', (req, res, next, id) => {
-  try { require('../utils/validation').objectId(id); next(); } catch (err) { next(err); }
-});
+const { objectId } = require('../utils/validation');
 const publicController = require('../controllers/publicController');
 const commentController = require('../controllers/commentController');
 const { commentRateLimit } = require('../middleware/rateLimit');
+
+// Reject malformed IDs before they reach a controller.
+router.param('id', (req, res, next, id) => {
+  try { objectId(id); next(); } catch (err) { next(err); }
+});
 
 router.get('/', publicController.getHome);
 router.get('/api/articles', publicController.getArticles);
