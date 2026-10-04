@@ -2,12 +2,20 @@
   let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Review: ' + article.title;
   const hasUpdate = !!(article.pendingUpdate && article.pendingUpdate.status === 'pending');
-  extraHead = hasUpdate ? '<script src="https://cdn.jsdelivr.net/npm/diff@5.2.0/dist/diff.min.js"></script>' : '';
   extraScripts = `<script>
     window.ARTICLE_ID = ${JSON.stringify(article._id.toString())};
     window.HAS_UPDATE = ${hasUpdate};
   </script>
   <script src="/js/editor-review.js"></script>`;
+
+  // Compare the published version with the pending update field by field,
+  // so the editor can see what changed without any client-side library.
+  const compareFields = [['title', 'Title'], ['summary', 'Summary'], ['content', 'Content'], ['image', 'Image']];
+  const changedFields = hasUpdate
+    ? compareFields.filter(([key]) => (article[key] || '') !== (article.pendingUpdate[key] || ''))
+    : [];
+  const isChanged = (key) => changedFields.some(([changedKey]) => changedKey === key);
+  const editLabel = hasUpdate ? 'Edit Pending Update' : article.status === 'published' ? 'Edit Published Article' : 'Edit Article';
 %>
 <%- include('../partials/header', { pageTitle, extraHead }) %>
 
@@ -15,41 +23,36 @@
   <div class="dashboard-header">
     <h1>Article Review</h1>
     <div class="header-actions">
-      <% if (article.status !== 'published' || hasUpdate) { %>
-        <a href="/editor/articles/<%= article._id %>/edit" class="btn btn-outline"><%= hasUpdate ? 'Edit Pending Update' : 'Edit Article' %></a>
-      <% } %>
+      <a href="/editor/articles/<%= article._id %>/edit" class="btn btn-outline"><%= editLabel %></a>
       <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
     </div>
   </div>
 
   <% if (hasUpdate) { %>
-    <style>
-      ins.diff-add { background: #d4f7d4; color: #155724; text-decoration: none; border-radius: 2px; padding: 0 1px; }
-      del.diff-del { background: #fdd; color: #721c24; text-decoration: line-through; border-radius: 2px; padding: 0 1px; }
-      .diff-field-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #6b7280; margin: 1rem 0 0.25rem; }
-      .diff-content { white-space: pre-wrap; line-height: 1.7; }
-    </style>
+    <p class="info-banner">
+      <% if (changedFields.length) { %>
+        <strong>Changed in this update:</strong> <%= changedFields.map(([, label]) => label).join(', ') %>
+      <% } else { %>
+        <strong>No content changes:</strong> the pending update is identical to the published version.
+      <% } %>
+    </p>
     <div class="update-compare">
       <div class="version-panel">
         <div class="version-label published">Currently Published</div>
-        <div class="diff-field-label">Title</div>
-        <div id="diff-title-old" class="diff-content"><%= article.title %></div>
-        <div class="diff-field-label">Summary</div>
-        <div id="diff-summary-old" class="diff-content"><%= article.summary %></div>
-        <div class="diff-field-label">Content</div>
-        <div id="diff-content-old" class="diff-content"><%= article.content %></div>
+        <% compareFields.slice(0, 3).forEach(([key, label]) => { %>
+          <div class="diff-field-label"><%= label %></div>
+          <div class="diff-content"><%= article[key] %></div>
+        <% }); %>
         <div class="diff-field-label">Image</div>
         <% if (article.image) { %><img src="<%= article.image %>" alt="Published article image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %>
       </div>
       <div class="version-panel">
         <div class="version-label pending">Pending Update</div>
-        <div class="diff-field-label">Title</div>
-        <div id="diff-title-new" class="diff-content"><%= article.pendingUpdate.title %></div>
-        <div class="diff-field-label">Summary</div>
-        <div id="diff-summary-new" class="diff-content"><%= article.pendingUpdate.summary %></div>
-        <div class="diff-field-label">Content</div>
-        <div id="diff-content-new" class="diff-content"><%= article.pendingUpdate.content %></div>
-        <div class="diff-field-label">Image</div>
+        <% compareFields.slice(0, 3).forEach(([key, label]) => { %>
+          <div class="diff-field-label"><%= label %><% if (isChanged(key)) { %> <span class="change-tag">Changed</span><% } %></div>
+          <div class="diff-content<%= isChanged(key) ? ' diff-changed' : '' %>"><%= article.pendingUpdate[key] %></div>
+        <% }); %>
+        <div class="diff-field-label">Image<% if (isChanged('image')) { %> <span class="change-tag">Changed</span><% } %></div>
         <% if (article.pendingUpdate.image) { %><img src="<%= article.pendingUpdate.image %>" alt="Proposed article image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %>
       </div>
     </div>

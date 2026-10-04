@@ -1,7 +1,10 @@
 <%
   let pageTitle, extraHead = '', extraScripts = '';
   const editingUpdate = editTarget === 'update';
-  const editable = editingUpdate ? article.pendingUpdate : article;
+  // A published article is edited through its pending update. Without one,
+  // the form starts from the live content and saving creates the update.
+  const hasPendingUpdate = !!(article.pendingUpdate && article.pendingUpdate.status === 'pending');
+  const editable = editingUpdate && hasPendingUpdate ? article.pendingUpdate : article;
   pageTitle = 'Edit: ' + editable.title;
   extraScripts = `<script>
     window.ARTICLE_ID = ${JSON.stringify(article._id.toString())};
@@ -13,7 +16,7 @@
 <div class="editor-page">
   <div class="dashboard-header">
     <div>
-      <h1><%= editingUpdate ? 'Edit Pending Update' : 'Edit Article' %></h1>
+      <h1><%= !editingUpdate ? 'Edit Article' : hasPendingUpdate ? 'Edit Pending Update' : 'Edit Published Article' %></h1>
       <p class="analytics-meta">
         By <%= article.author ? article.author.name : '—' %> &bull;
         <span class="status-badge status-<%= article.status %>"><%= article.status %></span>
@@ -25,7 +28,8 @@
     </div>
   </div>
 
-  <% if (editingUpdate) { %><p class="info-banner">Changes stay in the pending update until you approve it. The published article remains unchanged.</p><% } %>
+  <% if (editingUpdate && hasPendingUpdate) { %><p class="info-banner">Changes stay in the pending update until you approve it. The published article remains unchanged.</p><% } %>
+  <% if (editingUpdate && !hasPendingUpdate) { %><p class="info-banner">Your changes will be saved as a pending update. Readers keep seeing the published version until you approve the update on the review page.</p><% } %>
   <div id="edit-message" class="action-message hidden" role="status" aria-live="polite"></div>
 
   <form id="editor-edit-form" class="article-edit-form" data-edit-target="<%= editTarget %>" data-revision="<%= article.__v %>" data-partial="<%= article.status === 'draft' %>">
