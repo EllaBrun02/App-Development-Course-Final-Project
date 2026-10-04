@@ -25,5 +25,7 @@
     Fresh weather is unavailable. Retrying automatically.
   </div>
   <div class="weather-updated">Observation: <span id="weather-updated"><%= weatherFresh ? new Date(weather.observedAt).toLocaleTimeString() : '--' %></span></div>
+  <%# Open-Meteo's free data is licensed CC BY 4.0, which requires this credit %>
+  <div class="weather-credit"><a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a></div>
 </div>
 <script src="/js/weather.js" defer></script>

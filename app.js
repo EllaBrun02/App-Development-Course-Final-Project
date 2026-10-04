@@ -7,6 +7,8 @@ const fs = require('fs');
 const connectDB = require('./config/db');
 const logger = require('./utils/logger');
 const { getSecret } = require('./utils/secret');
+const { startWeatherUpdates } = require('./utils/weather');
+const { errorResponse } = require('./utils/validation');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +23,9 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
+// Chart.js is installed with npm and served locally, so the analytics page
+// does not depend on an external CDN. Only its dist folder is exposed.
+app.use('/vendor/chart.js', express.static(path.join(__dirname, 'node_modules', 'chart.js', 'dist')));
 
 // Body parsing
 // Allow the validated 100,000-character body, including multi-byte UTF-8 text.
@@ -49,8 +54,8 @@ const logStream = fs.createWriteStream(path.join(__dirname, 'logs', 'access.log'
 app.use(morgan('combined', { stream: logStream }));
 
 // Sessions — stored in MongoDB so they survive server restarts.
-// Audit #34: no known default secret (env var or a locally persisted random
-// secret), and the cookie is httpOnly + SameSite=Lax as a CSRF mitigation.
+// No known default secret (env var or a locally persisted random secret),
+// and the cookie is httpOnly + SameSite=Lax as a CSRF mitigation.
 app.use(session({
   secret: getSecret(),
   resave: false,
@@ -63,7 +68,7 @@ app.use(session({
   },
 }));
 
-// CSRF mitigation (audit #34): for state-changing requests, if the browser
+// CSRF mitigation: for state-changing requests, if the browser
 // sent an Origin (or Referer) header, it must match the host we serve.
 // Requests from other sites are rejected before reaching any route.
 app.use((req, res, next) => {
@@ -95,11 +100,12 @@ app.use((req, res) => {
 // Global error handler
 app.use((err, req, res, next) => {
   logger.error(`Unhandled error: ${err.stack}`);
-  require('./utils/validation').errorResponse(err, req, res);
+  errorResponse(err, req, res);
 });
 
 app.listen(PORT, () => {
   logger.info(`The Daily Web server running on http://localhost:${PORT}`);
+  startWeatherUpdates(); // keep the shared weather cache fresh in the background
 });
 
 module.exports = app;

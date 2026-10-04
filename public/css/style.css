@@ -333,6 +333,8 @@ button, input, select, textarea { font: inherit; }
 .weather-city { font-weight: 500; font-size: 1rem; }
 .weather-desc, .weather-wind, .weather-updated { color: #4f405e; line-height: 1.6; }
 .weather-updated { border-top: 1px solid #291c3a30; padding-top: 14px; margin-top: 18px; }
+.weather-credit { margin-top: 6px; font-size: 0.72rem; font-family: Arial, sans-serif; }
+.weather-credit a { color: #4f405e; }
 .categories-widget { background: transparent; padding: 12px 4px; box-shadow: none; }
 .category-link { display: flex; justify-content: space-between; align-items: center; min-height: 48px; padding: 10px 0; }
 .category-link span { color: #686070; }
