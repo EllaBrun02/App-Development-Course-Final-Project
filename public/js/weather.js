@@ -1,13 +1,16 @@
-// Expire displayed values at the provider's observation deadline, even offline.
+// Shows weather only while it is at most 15 minutes old: values are cleared at
+// the observation's expiry time, even if the network is down.
 (function () {
   'use strict';
 
   const widget = document.getElementById('weather-widget');
   if (!widget) return;
 
-  const REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+  const NEXT_OBSERVATION_MS = 4 * 1000; // the server fetches the next observation just after expiry
+  const RETRY_MS = 10 * 1000; // ask again soon while weather is unavailable
   let expiresAt = Date.parse(widget.dataset.expiresAt);
   let expiryTimer;
+  let refreshTimer;
   let refreshing = false;
 
   function setText(id, text) {
@@ -25,21 +28,28 @@
     document.getElementById('weather-stale')?.classList.remove('hidden');
   }
 
+  function scheduleRefresh(ms) {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(refresh, ms);
+  }
+
+  // Returns false (and clears the widget) when the current value has expired.
   function scheduleExpiry() {
     clearTimeout(expiryTimer);
     const remaining = expiresAt - Date.now();
     if (!Number.isFinite(remaining) || remaining <= 0) {
       showUnavailable();
-      return;
+      return false;
     }
     expiryTimer = setTimeout(() => {
       showUnavailable();
-      refresh();
+      scheduleRefresh(NEXT_OBSERVATION_MS);
     }, remaining);
+    return true;
   }
 
   // Mirrors the icon choice in views/partials/weather.ejs so the SVG stays
-  // in sync with the refreshed description (review finding #2).
+  // in sync with the refreshed description.
   function iconSvg(description) {
     const open = '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
     let body;
@@ -75,24 +85,24 @@
       setText('weather-desc', weather.description);
       setText('weather-wind', `Wind: ${weather.windspeed} km/h`);
       setText('weather-updated', new Date(weather.observedAt).toLocaleTimeString());
-      const stale = document.getElementById('weather-stale');
-      if (stale) stale.classList.toggle('hidden', !weather.stale);
+      document.getElementById('weather-stale')?.classList.add('hidden');
       scheduleExpiry();
     } catch (e) {
       showUnavailable();
+      scheduleRefresh(RETRY_MS);
     } finally {
       refreshing = false;
     }
   }
 
+  // On load, and when a suspended/background tab comes back: keep a fresh
+  // value, or ask the server again right away if it has expired.
   function resume() {
-    scheduleExpiry();
-    refresh();
+    if (!scheduleExpiry()) refresh();
   }
 
-  scheduleExpiry();
-  setInterval(refresh, REFRESH_MS);
-  window.addEventListener('pageshow', resume);
+  resume();
+  window.addEventListener('pageshow', (event) => { if (event.persisted) resume(); });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') resume();
   });

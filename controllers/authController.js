@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const logger = require('../utils/logger');
 
-// Login attempt limiting (audit #34): max 10 failed attempts per IP per
+// Login attempt limiting: max 10 failed attempts per IP per
 // 15 minutes. Successful login clears the counter.
 const FAIL_WINDOW_MS = 15 * 60 * 1000;
 const MAX_FAILED_ATTEMPTS = 10;
@@ -25,7 +25,7 @@ exports.postLogin = async (req, res) => {
   const { username, password } = req.body;
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
 
-  // Audit #34: limit repeated failed login attempts per IP
+  // Limit repeated failed login attempts per IP
   if (recentFailures(ip).length >= MAX_FAILED_ATTEMPTS) {
     logger.warn(`Login rate limit hit for IP ${ip}`);
     return res.status(429).render('login', { error: 'Too many failed login attempts. Please try again in a few minutes.' });
@@ -46,7 +46,7 @@ exports.postLogin = async (req, res) => {
 
     failedLogins.delete(ip);
 
-    // Audit #34: regenerate the session ID on login (prevents session fixation).
+    // Regenerate the session ID on login (prevents session fixation).
     req.session.regenerate((err) => {
       if (err) {
         logger.error(`Session regenerate error: ${err.message}`);

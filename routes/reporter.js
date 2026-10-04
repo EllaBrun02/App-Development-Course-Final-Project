@@ -1,10 +1,13 @@
 const express = require('express');
 const router = express.Router();
-router.param('id', (req, res, next, id) => {
-  try { require('../utils/validation').objectId(id); next(); } catch (err) { next(err); }
-});
+const { objectId } = require('../utils/validation');
 const { requireRole } = require('../middleware/auth');
 const rc = require('../controllers/reporterController');
+
+// Reject malformed IDs before they reach a controller.
+router.param('id', (req, res, next, id) => {
+  try { objectId(id); next(); } catch (err) { next(err); }
+});
 
 const isReporter = requireRole('reporter');
 

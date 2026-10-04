@@ -16,7 +16,7 @@ const readline = require('readline');
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/the-daily-web';
 
-// Audit #36: seeding DELETES all existing data. Warn loudly and require
+// Seeding DELETES all existing data. Warn loudly and require
 // confirmation (pass --yes to skip, e.g. in scripts).
 async function confirmWipe() {
   console.log('╔══════════════════════════════════════════════════════════════╗');
@@ -248,7 +248,7 @@ async function seed() {
       for (let h = 0; h < 24; h += 3) {
         const hour = new Date(Date.now() - d * 24 * 3600 * 1000);
         hour.setHours(h, 0, 0, 0);
-        // Audit #25: never generate view records in the future — only hours
+        // Never generate view records in the future — only hours
         // that already passed, and only after the article was published.
         if (hour > article.publishedAt && hour <= now) {
           const timeBoost = (h >= 8 && h <= 20) ? 3 : 1;
@@ -266,7 +266,7 @@ async function seed() {
     const key = article._id.toString();
     viewTotals.set(key, (viewTotals.get(key) || 0) + addPublishEvent(article._id, article.publishedAt));
 
-    // Audit #24: give some articles multiple APPROVED updates after their
+    // Give some articles multiple APPROVED updates after their
     // initial publication, so the Impact Analytics graph can demonstrate
     // view behaviour before/after each update marker.
     if (ai < 10) {
@@ -307,7 +307,7 @@ async function seed() {
   for (const article of publishedArticles.slice(0, 200)) {
     const commentCount = randInt(0, 8);
     for (let c = 0; c < commentCount; c++) {
-      // Audit #25: comment timestamps must also never be in the future
+      // Comment timestamps must also never be in the future
       const createdAt = new Date(Math.min(
         article.publishedAt.getTime() + randInt(1, 72) * 3600 * 1000,
         Date.now()

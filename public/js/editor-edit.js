@@ -45,7 +45,10 @@
       const data = await res.json();
       if (res.ok) {
         form.dataset.revision = data.revision;
-        showMsg('Changes saved successfully.', 'success');
+        const savedText = form.dataset.editTarget === 'update'
+          ? 'Saved as a pending update. Approve it on the review page to publish it.'
+          : 'Changes saved successfully.';
+        showMsg(savedText, 'success');
         setTimeout(() => window.location.href = `/editor/articles/${ARTICLE_ID}`, 1200);
       } else {
         unlock();

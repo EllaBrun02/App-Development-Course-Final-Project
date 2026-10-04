@@ -72,9 +72,7 @@
               </td>
               <td class="col-actions">
                 <a href="/editor/articles/<%= a._id %>" class="btn btn-sm btn-outline">Review</a>
-                <% if (a.status !== 'published' || a.pendingUpdate?.status === 'pending') { %>
-                  <a href="/editor/articles/<%= a._id %>/edit" class="btn btn-sm btn-outline">Edit</a>
-                <% } %>
+                <a href="/editor/articles/<%= a._id %>/edit" class="btn btn-sm btn-outline">Edit</a>
                 <% if (a.status === 'published') { %>
                   <a href="/article/<%= a._id %>" class="btn btn-sm btn-outline">View Live</a>
                   <a href="/editor/analytics/<%= a._id %>" class="btn btn-sm btn-analytics">Analytics</a>
@@ -87,7 +85,7 @@
       </table>
     </div>
 
-    <%# Audit #28: dashboard is paginated on the server (50 per page) %>
+    <%# Dashboard is paginated on the server (50 per page) %>
     <% if (totalPages > 1) { %>
       <%
         const baseParams = [];
