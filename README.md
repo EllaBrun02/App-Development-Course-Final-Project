@@ -51,7 +51,7 @@ These are fictional local demonstration accounts.
 
 ### Demo data
 
-The seed creates 2 editors, 5 reporters and **500 articles** across 8 categories: 300 published, 100 waiting for approval, 50 drafts and 50 returned for corrections. Fifty published articles also have a pending update. It adds 30 days of hourly view statistics, several articles with multiple approved updates after publication, and comments.
+The seed creates 2 editors, 5 reporters and **550 articles** across 8 categories: 300 published, 150 pending review (100 new articles and 50 edits of published articles), 50 drafts and 50 returned for corrections. It adds 30 days of hourly view statistics, several articles with multiple approved updates after publication, and comments.
 
 To add three more update-history examples **without** deleting anything (for example, to an existing database), run `npm run demo:updates`. It adds three fictional articles titled `Demo: …`, each with an initial publication, two approved updates and 72 hours of views.
 
@@ -75,14 +75,14 @@ Examples — macOS/Linux: `PORT=3100 npm start` · Windows PowerShell: `$env:POR
 │   └── db.js                  # MongoDB connection
 ├── models/                    # Mongoose models (the four main models)
 │   ├── User.js                # reporters and editors (bcrypt password hash)
-│   ├── Article.js             # article content, workflow status, auto-save and pending update
+│   ├── Article.js             # article content, workflow status, auto-save, link to the published article it edits
 │   ├── Comment.js             # article comments
 │   └── ViewStat.js            # hourly view counters + publish/update events for analytics
 ├── controllers/
 │   ├── publicController.js    # home page, articles API (search/filter/sort/paging), article page
 │   ├── commentController.js   # add comment
 │   ├── authController.js      # login / logout
-│   ├── reporterController.js  # reporter dashboard, create/auto-save/submit articles and updates
+│   ├── reporterController.js  # reporter dashboard, create/auto-save/submit articles and edits
 │   ├── editorController.js    # editor dashboard, review, edit, publish/return/delete, analytics
 │   └── managementController.js# CRUD for users, comments and view records (editor only)
 ├── routes/
@@ -97,12 +97,13 @@ Examples — macOS/Linux: `PORT=3100 npm start` · Windows PowerShell: `$env:POR
 │   ├── logger.js              # writes logs/app.log
 │   ├── weather.js             # Open-Meteo client with a shared, self-refreshing cache
 │   ├── secret.js              # session secret (environment variable or local file)
+│   ├── diff.js                # word-level comparison of an edit with the published version
 │   └── validation.js          # input validation and consistent error responses
 ├── views/                     # EJS templates
 │   ├── index.ejs              # home page / news feed
 │   ├── article.ejs            # full article page (rendered on the server for SEO)
 │   ├── login.ejs, error.ejs
-│   ├── partials/              # header, footer, weather widget
+│   ├── partials/              # header, footer, weather widget, status badge
 │   ├── reporter/              # dashboard, article editor
 │   └── editor/                # dashboard, review, edit, analytics, data management
 ├── public/
@@ -115,7 +116,7 @@ Examples — macOS/Linux: `PORT=3100 npm start` · Windows PowerShell: `$env:POR
 └── logs/                      # app.log and access.log (created automatically)
 ```
 
-Client scripts in `public/js/`: `home.js` (feed, infinite scroll, filters), `article.js` (comments), `article-editor.js` (reporter auto-save and submit), `editor.js` (delete), `editor-review.js` (approve/return), `editor-edit.js` (editor edits), `analytics.js` (graph), `management.js` (CRUD screen), `weather.js` (weather widget refresh/expiry), `image-fallback.js` (broken images).
+Client scripts in `public/js/`: `home.js` (feed, infinite scroll, filters), `article.js` (comments), `article-editor.js` (reporter auto-save and submit), `editor.js` (delete), `edit-guard.js` (error when an edit is already pending), `editor-review.js` (approve/return), `editor-edit.js` (editor edits), `analytics.js` (graph), `management.js` (CRUD screen), `weather.js` (weather widget refresh/expiry), `image-fallback.js` (broken images).
 
 ## Main Features
 
@@ -129,19 +130,23 @@ Client scripts in `public/js/`: `home.js` (feed, infinite scroll, filters), `art
 - **Comment limit** — at most 3 comments per minute from the same device; the server blocks more and returns a clear message. The limit is checked per signed device cookie and per IP address and is stored in MongoDB, so clearing cookies or restarting the server does not reset it
 - **Weather widget** in the sidebar (Open-Meteo). The server refreshes one shared cache in the background, so thousands of visitors cause one provider request every 15 minutes and pages never wait for the provider. Weather is shown only while the observation is at most 15 minutes old; otherwise the widget shows "Currently unavailable" and keeps retrying
 
+### Article statuses
+
+Every article has exactly one status: **Draft**, **Pending review**, **Published** or **Returned for corrections**, and reporters and editors see the same label. Pending review holds two kinds of articles: new ones, and edits of published articles. An edit is a separate article linked to the published one, and a published article can have only one edit at a time (a unique index enforces it). While an edit is pending, Edit on the published article shows an error message; deleting the edit allows a new one.
+
 ### Reporter
 
 - Dashboard with own articles and their status: **Draft**, **Pending review**, **Published**, **Returned for corrections**
 - Create articles, edit own drafts, submit for review, see the editor's note on returned articles, fix and resubmit
 - **Auto-save** — work is saved to the server while typing, without pressing Save. Closing the browser, refreshing or switching computers does not lose saved work; reopening the article shows the latest version. A local backup also protects the last keystrokes before the server confirms them
-- **Edit published articles** — changes are saved as a pending update. Readers keep seeing the published version until an editor approves the update
+- **Edit published articles** — submitting creates a new article with status **Pending review**, linked to the published one. Readers keep seeing the published version until an editor approves the edit
 
 ### Editor
 
 - Dashboard of all articles with search, filter by status and category, and paging (50 per page)
 - Review a submitted article: **publish** it, **return** it to the reporter with a required note, **edit** it, or **delete** it
-- **Pending updates** to published articles are shown side by side (currently published vs. pending), with changed fields marked. Approving makes the new content public
-- **Edit any article** — published articles are edited through a pending update, which the editor then approves
+- **Edits of published articles** are reviewed as a diff against the published version: removed text in red, added text in green. Approving deletes the old published article and publishes the edit in its place; its comments, views and analytics move with it, and the old link redirects to it
+- **Edit any article** — editing a published article also creates a linked pending article, which the editor then approves
 - **Impact Analytics** — a Chart.js graph of views per hour over time (24h / 7 days / 30 days / all), with a marker at every publish or approved update, to compare views before and after each update
 - **Data management** screen — list, search, create, update and delete users, comments and view records
 

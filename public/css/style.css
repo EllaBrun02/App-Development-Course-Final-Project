@@ -101,7 +101,9 @@ button.btn { appearance: none; }
 .status-pending { background: #FEF3C7; color: #92400E; }
 .status-published { background: #D1FAE5; color: #065F46; }
 .status-returned { background: #FEE2E2; color: #991B1B; }
-.tag-small { font-size: 0.72rem; padding: 0.15rem 0.5rem; }
+/* Second line in a title cell: the published article this one is an edit of */
+.edit-of { font-size: 0.8rem; font-weight: 400; color: var(--text-muted); margin-top: 0.2rem; }
+.edit-blocked-error { margin: 0.5rem 0 0; }
 
 /* ===================== Forms ===================== */
 .form-group { margin-bottom: 1.25rem; }
@@ -233,14 +235,16 @@ button.btn { appearance: none; }
 /* ===================== Article Review ===================== */
 .review-page { max-width: 1000px; margin: 0 auto; }
 .update-compare { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; }
-.version-panel { flex: 1; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1.5rem; }
-.version-label { font-family: Arial, sans-serif; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 4px; display: inline-block; }
-.version-label.published { background: #D1FAE5; color: #065F46; }
-.version-label.pending { background: #FEF3C7; color: #92400E; }
+.update-compare > * { flex: 1; min-width: 0; }
 .diff-field-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #6b7280; margin: 1rem 0 0.25rem; }
-.diff-content { white-space: pre-wrap; line-height: 1.7; }
-.diff-changed { background: #FEF9E7; border-left: 3px solid #f6ce55; padding: 0.25rem 0.5rem; }
-.change-tag { background: #f6ce55; color: #291c3a; border-radius: 4px; padding: 0.05rem 0.4rem; margin-left: 0.4rem; font-size: 0.7rem; letter-spacing: 0.03em; }
+.diff-content { white-space: pre-wrap; line-height: 1.7; overflow-wrap: anywhere; }
+/* Edit compared with the published version: red = removed, green = added */
+.diff-del { background: #FEE2E2; color: #991B1B; text-decoration: line-through; }
+.diff-ins { background: #D1FAE5; color: #065F46; text-decoration: none; }
+.diff-legend { margin-left: auto; display: flex; gap: 0.5rem; }
+.diff-legend del, .diff-legend ins { padding: 0 0.4rem; border-radius: 4px; }
+.image-removed .review-image { outline: 3px solid #FCA5A5; }
+.image-added .review-image { outline: 3px solid #6EE7B7; }
 .body-preview { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.75rem; }
 .summary-text { color: var(--text-muted); font-style: italic; }
 .review-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
@@ -358,8 +362,7 @@ button, input, select, textarea { font: inherit; }
 .col-title { min-width: 180px; font-weight: 600; }
 .col-actions { display: table-cell; min-width: 190px; white-space: normal; }
 .col-actions .btn { margin: 3px 2px; }
-.article-edit-form, .article-review-content, .version-panel, .return-form, .chart-container { border: 1px solid var(--border); box-shadow: none; border-radius: 12px; }
-.version-panel { min-width: 0; overflow-wrap: anywhere; }
+.article-edit-form, .article-review-content, .return-form, .chart-container { border: 1px solid var(--border); box-shadow: none; border-radius: 12px; }
 .form-actions, .review-actions, .chart-legend { flex-wrap: wrap; }
 .chart-container { height: 380px; }
 .review-body, .body-preview { overflow-wrap: anywhere; }
@@ -390,7 +393,7 @@ button, input, select, textarea { font: inherit; }
   .content-with-sidebar { gap: 32px; }
   .footer-inner { align-items: flex-start; flex-direction: column; }
   .auth-card { padding: 28px 22px; }
-  .article-edit-form, .article-review-content, .version-panel { padding: 20px; }
+  .article-edit-form, .article-review-content { padding: 20px; }
   .filter-form > select { flex: 1 1 160px; max-width: 100%; }
   .form-actions > .btn, .review-actions > .btn { flex: 1 1 auto; white-space: normal; }
   .chart-container { height: 300px; padding: 12px; }

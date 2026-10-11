@@ -1,70 +1,73 @@
 <%
   let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Review: ' + article.title;
-  const hasUpdate = !!(article.pendingUpdate && article.pendingUpdate.status === 'pending');
   extraScripts = `<script>
     window.ARTICLE_ID = ${JSON.stringify(article._id.toString())};
-    window.HAS_UPDATE = ${hasUpdate};
   </script>
-  <script src="/js/editor-review.js"></script>`;
-
-  // Compare the published version with the pending update field by field,
-  // so the editor can see what changed without any client-side library.
-  const compareFields = [['title', 'Title'], ['summary', 'Summary'], ['content', 'Content'], ['image', 'Image']];
-  const changedFields = hasUpdate
-    ? compareFields.filter(([key]) => (article[key] || '') !== (article.pendingUpdate[key] || ''))
-    : [];
-  const isChanged = (key) => changedFields.some(([changedKey]) => changedKey === key);
-  const editLabel = hasUpdate ? 'Edit Pending Update' : article.status === 'published' ? 'Edit Published Article' : 'Edit Article';
+  <script src="/js/editor-review.js"></script>
+  <script src="/js/edit-guard.js"></script>`;
+  // "original" is the published article this one is an edit of (if any).
+  const isEdit = !!original;
+  const editPendingHere = !!(edit && edit.status === 'pending');
+  const editHref = '/editor/articles/' + (edit ? edit._id : article._id) + '/edit';
+  const changed = diffs.filter((d) => d.changed).map((d) => d.label);
+  if (isEdit && (original.image || '') !== (article.image || '')) changed.push('Image');
 %>
 <%- include('../partials/header', { pageTitle, extraHead }) %>
 
 <div class="review-page">
   <div class="dashboard-header">
-    <h1>Article Review</h1>
+    <h1><%= isEdit ? 'Edit Review' : 'Article Review' %></h1>
     <div class="header-actions">
-      <a href="/editor/articles/<%= article._id %>/edit" class="btn btn-outline"><%= editLabel %></a>
+      <a href="<%= editHref %>" class="btn btn-outline" <% if (editPendingHere) { %>data-edit-blocked="<%= editPending %>"<% } %>><%= article.status === 'published' ? 'Edit Published Article' : 'Edit Article' %></a>
       <a href="/editor" class="btn btn-outline">&larr; Dashboard</a>
     </div>
   </div>
 
-  <% if (hasUpdate) { %>
+  <% if (edit) { %>
     <p class="info-banner">
-      <% if (changedFields.length) { %>
-        <strong>Changed in this update:</strong> <%= changedFields.map(([, label]) => label).join(', ') %>
+      <% if (editPendingHere) { %>
+        <strong>An edit of this article is waiting for review.</strong> <a href="/editor/articles/<%= edit._id %>">Review the edit</a>
       <% } else { %>
-        <strong>No content changes:</strong> the pending update is identical to the published version.
+        <strong>An edit of this article was returned to the reporter.</strong> <a href="/editor/articles/<%= edit._id %>">Open the edit</a>
       <% } %>
     </p>
-    <div class="update-compare">
-      <div class="version-panel">
-        <div class="version-label published">Currently Published</div>
-        <% compareFields.slice(0, 3).forEach(([key, label]) => { %>
-          <div class="diff-field-label"><%= label %></div>
-          <div class="diff-content"><%= article[key] %></div>
-        <% }); %>
-        <div class="diff-field-label">Image</div>
-        <% if (article.image) { %><img src="<%= article.image %>" alt="Published article image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %>
+  <% } %>
+
+  <% if (isEdit) { %>
+    <p class="info-banner">
+      <strong>Edit of a published article.</strong> Approving it deletes the published version and publishes this article in its place.
+      <a href="/article/<%= original._id %>">View the published version</a>
+    </p>
+    <div class="article-review-content">
+      <div class="review-meta">
+        <span class="badge"><%= article.category %></span>
+        <%- include('../partials/status-badge', { status: article.status }) %>
+        <span>By: <%= article.author ? article.author.name : '—' %></span>
+        <span class="diff-legend"><del class="diff-del">Removed</del> <ins class="diff-ins">Added</ins></span>
       </div>
-      <div class="version-panel">
-        <div class="version-label pending">Pending Update</div>
-        <% compareFields.slice(0, 3).forEach(([key, label]) => { %>
-          <div class="diff-field-label"><%= label %><% if (isChanged(key)) { %> <span class="change-tag">Changed</span><% } %></div>
-          <div class="diff-content<%= isChanged(key) ? ' diff-changed' : '' %>"><%= article.pendingUpdate[key] %></div>
-        <% }); %>
-        <div class="diff-field-label">Image<% if (isChanged('image')) { %> <span class="change-tag">Changed</span><% } %></div>
-        <% if (article.pendingUpdate.image) { %><img src="<%= article.pendingUpdate.image %>" alt="Proposed article image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %>
-      </div>
-    </div>
-    <div class="review-actions">
-      <button id="approve-update-btn" class="btn btn-primary">Approve Update</button>
-      <button id="return-update-btn" class="btn btn-danger">Return Update</button>
+      <p class="review-summary">
+        <strong>Changes compared with the published version:</strong> <%= changed.length ? changed.join(', ') : 'none' %>
+      </p>
+      <% diffs.forEach((d) => { %>
+        <div class="diff-field-label"><%= d.label %><% if (!d.changed) { %> &mdash; no changes<% } %></div>
+        <div class="diff-content"><% d.parts.forEach((p) => { %><% if (p.type === 'same') { %><%= p.text %><% } else if (p.type === 'del') { %><del class="diff-del"><%= p.text %></del><% } else { %><ins class="diff-ins"><%= p.text %></ins><% } %><% }); %></div>
+      <% }); %>
+      <div class="diff-field-label">Image<% if (!changed.includes('Image')) { %> &mdash; no changes<% } %></div>
+      <% if (changed.includes('Image')) { %>
+        <div class="update-compare">
+          <div class="image-removed"><% if (original.image) { %><img src="<%= original.image %>" alt="Published image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %></div>
+          <div class="image-added"><% if (article.image) { %><img src="<%= article.image %>" alt="New image" class="review-image" data-image-fallback><% } else { %><p>No image</p><% } %></div>
+        </div>
+      <% } else if (article.image) { %>
+        <img src="<%= article.image %>" alt="" class="review-image" data-image-fallback>
+      <% } %>
     </div>
   <% } else { %>
     <div class="article-review-content">
       <div class="review-meta">
         <span class="badge"><%= article.category %></span>
-        <span class="status-badge status-<%= article.status %>"><%= article.status %></span>
+        <%- include('../partials/status-badge', { status: article.status }) %>
         <span>By: <%= article.author ? article.author.name : '—' %></span>
       </div>
       <h2 id="review-title"><%= article.title %></h2>
@@ -72,13 +75,17 @@
       <p class="review-summary"><strong>Summary:</strong> <%= article.summary %></p>
       <div class="review-body"><%= article.content %></div>
     </div>
+  <% } %>
 
-    <% if (article.status === 'pending') { %>
-      <div class="review-actions">
-        <button id="publish-btn" class="btn btn-primary">Publish</button>
-        <button id="return-btn" class="btn btn-danger">Return to Reporter</button>
-      </div>
-    <% } %>
+  <% if (article.status === 'pending') { %>
+    <div class="review-actions">
+      <% if (isEdit) { %>
+        <button id="publish-btn" class="btn btn-primary" data-confirm="Approve this edit? The published version will be deleted and this article published in its place." data-success="✓ Edit approved and published.">Approve Edit</button>
+      <% } else { %>
+        <button id="publish-btn" class="btn btn-primary" data-confirm="Publish this article to the public site?" data-success="✓ Article published successfully.">Publish</button>
+      <% } %>
+      <button id="return-btn" class="btn btn-danger">Return to Reporter</button>
+    </div>
   <% } %>
 
   <div id="return-form" class="return-form hidden">

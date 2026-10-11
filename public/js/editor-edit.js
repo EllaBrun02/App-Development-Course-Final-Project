@@ -40,16 +40,17 @@
       const res = await fetch(`/editor/articles/${ARTICLE_ID}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ title, summary, content, image, category, target: form.dataset.editTarget, revision: Number(form.dataset.revision) }),
+        body: JSON.stringify({ title, summary, content, image, category, revision: Number(form.dataset.revision) }),
       });
       const data = await res.json();
       if (res.ok) {
         form.dataset.revision = data.revision;
-        const savedText = form.dataset.editTarget === 'update'
-          ? 'Saved as a pending update. Approve it on the review page to publish it.'
+        // Editing a published article returns the id of the new pending article.
+        const savedText = data.id
+          ? 'Saved as a new article pending review. Approve it on its review page to publish it.'
           : 'Changes saved successfully.';
         showMsg(savedText, 'success');
-        setTimeout(() => window.location.href = `/editor/articles/${ARTICLE_ID}`, 1200);
+        setTimeout(() => window.location.href = `/editor/articles/${data.id || ARTICLE_ID}`, 1200);
       } else {
         unlock();
         showMsg(data.error || 'Failed to save.', 'error');

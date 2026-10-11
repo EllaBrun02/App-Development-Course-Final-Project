@@ -65,10 +65,12 @@ function errorResponse(err, req, res) {
             err instanceof URIError
           ? 400
           : 500);
+  // Messages written by the app (bad) are shown as they are; database
+  // conflicts (stale version, duplicate key) get a generic message.
   const message =
     status === 500
       ? 'Server error'
-      : status === 409
+      : status === 409 && !err.status
         ? 'Conflict: reload the current record before retrying.'
         : err.message;
   if (
