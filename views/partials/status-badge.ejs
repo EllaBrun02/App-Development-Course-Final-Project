@@ -1,0 +1,2 @@
+<%# One label per status, shared by the reporter and editor screens so both always show the same status. %>
+<span class="status-badge status-<%= status %>"><%= { draft: 'Draft', pending: 'Pending Review', published: 'Published', returned: 'Returned for Corrections' }[status] %></span>

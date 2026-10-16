@@ -1,20 +1,17 @@
 <%
   let pageTitle, extraHead = '', extraScripts = '';
   const isNew = !article;
+  // Editing a published article starts from its live content; submitting
+  // creates a new pending article linked to it.
   const isPublished = article && article.status === 'published';
-  const hasReturnedUpdate = article && article.pendingUpdate && article.pendingUpdate.status === 'returned';
-  const hasPendingUpdate = article && article.pendingUpdate && article.pendingUpdate.status === 'pending';
 
   // Determine the editable content
-  // For a published article being edited: use the pendingUpdate.autoSave or pendingUpdate or current article content
   let editTitle, editContent, editSummary, editImage;
   if (isPublished) {
-    const pu = article.pendingUpdate || {};
-    const as = pu.autoSave || {};
-    editTitle   = as.title   ?? pu.title   ?? article.title;
-    editContent = as.content ?? pu.content ?? article.content;
-    editSummary = as.summary ?? pu.summary ?? article.summary;
-    editImage   = as.image   ?? pu.image   ?? article.image;
+    editTitle   = article.title;
+    editContent = article.content;
+    editSummary = article.summary;
+    editImage   = article.image;
   } else if (article) {
     const as = article.autoSave || {};
     editTitle   = as.title   ?? article.title;
@@ -29,10 +26,9 @@
   extraScripts = `<script>
     window.ARTICLE_REVISION = ${article ? article.__v : 0};
     window.ARTICLE_USER = ${JSON.stringify(userId)};
-    window.ARTICLE_EDITABLE = ${!article || ['draft','returned'].includes(article.status) || (isPublished && !hasPendingUpdate)};
+    window.ARTICLE_EDITABLE = ${!article || ['draft','returned','published'].includes(article.status)};
     window.ARTICLE_ID = ${article ? JSON.stringify(article._id) : 'null'};
-    window.IS_PUBLISHED = ${isPublished};
-    window.HAS_PENDING_UPDATE = ${hasPendingUpdate};
+    window.IS_PUBLISHED = ${!!isPublished};
   </script>
   <script src="/js/article-editor.js"></script>`;
 %>
@@ -44,19 +40,6 @@
     <a href="/reporter" class="btn btn-outline">&larr; Dashboard</a>
   </div>
 
-  <% if (hasPendingUpdate) { %>
-    <div class="info-banner">
-      <strong>Update pending review.</strong> Your submitted update is waiting for editor approval. You cannot submit another update until the current one is processed.
-    </div>
-  <% } %>
-
-  <% if (hasReturnedUpdate) { %>
-    <div class="warning-banner">
-      <strong>Editor returned your update.</strong> Note: <%= article.pendingUpdate.editorNote %><br>
-      Please make corrections and re-submit.
-    </div>
-  <% } %>
-
   <% if (article && article.status === 'returned') { %>
     <div class="warning-banner">
       <strong>Editor returned this article.</strong> Note: <%= article.editorNote %><br>
@@ -66,7 +49,13 @@
 
   <% if (isPublished) { %>
     <div class="info-banner">
-      <strong>Published article.</strong> The current published version will remain live until your update is approved by an editor.
+      <strong>Published article.</strong> Submitting creates a new article with status Pending Review, linked to this one. The published version stays live until an editor approves it.
+    </div>
+  <% } %>
+
+  <% if (article && article.revisionOf) { %>
+    <div class="info-banner">
+      <strong>Edit of a published article.</strong> Once approved it replaces the <a href="/article/<%= article.revisionOf %>">published version</a>.
     </div>
   <% } %>
 
@@ -111,7 +100,7 @@
       <% if (isNew) { %>
         <button type="button" id="save-draft-btn" class="btn btn-outline">Save Draft</button>
         <button type="button" id="submit-btn" class="btn btn-primary">Submit for Review</button>
-      <% } else if (isPublished && !hasPendingUpdate) { %>
+      <% } else if (isPublished) { %>
         <button type="button" id="submit-update-btn" class="btn btn-primary">Submit Update for Review</button>
       <% } else if (article.status === 'returned' || article.status === 'draft') { %>
         <button type="button" id="save-draft-btn" class="btn btn-outline">Save Draft</button>

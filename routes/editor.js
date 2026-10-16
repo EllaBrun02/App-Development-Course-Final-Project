@@ -18,7 +18,6 @@ router.get('/articles/:id/edit', isEditor, ec.getEditArticle);
 router.get('/articles/:id', isEditor, ec.getArticleReview);
 router.patch('/articles/:id', isEditor, ec.editArticle);
 router.patch('/articles/:id/publish', isEditor, ec.publishArticle);
-router.patch('/articles/:id/approve-update', isEditor, ec.approveUpdate);
 router.patch('/articles/:id/return', isEditor, ec.returnArticle);
 router.delete('/articles/:id', isEditor, ec.deleteArticle);
 

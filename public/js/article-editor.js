@@ -55,7 +55,7 @@
           if (typeof cached.data[k] === 'string') document.getElementById(k).value = cached.data[k];
         draftKey = cached.draftKey;
         dirty = true;
-        message('Recovered unsaved work; saving to server…');
+        message(window.IS_PUBLISHED ? 'Recovered your unsubmitted changes' : 'Recovered unsaved work; saving to server…');
       } else {
         showError(
           new Error(
@@ -135,20 +135,23 @@
     dirty = true;
     backup();
     message(
-      'Auto-save failed — changes not saved to server. Retry by editing or pressing Save Draft.',
+      window.IS_PUBLISHED
+        ? 'Not submitted — your changes are kept in this browser.'
+        : 'Auto-save failed — changes not saved to server. Retry by editing or pressing Save Draft.',
     );
     showError(e);
   }
   function flush(keepalive = false) {
     clearTimeout(timer);
     return enqueue(async () => {
-      if (!editable || !dirty) return;
+      // An edit of a published article reaches the server only when submitted.
+      if (!editable || !dirty || window.IS_PUBLISHED) return;
       const snapshot = data();
       message('Saving…');
       await ensureId(snapshot);
       await api(
         `/reporter/articles/${id}/autosave`,
-        { ...snapshot, isUpdate: !!window.IS_PUBLISHED, revision },
+        { ...snapshot, revision },
         'PATCH',
         keepalive,
       );
@@ -164,6 +167,7 @@
     input.addEventListener('input', () => {
       dirty = true;
       backup();
+      if (window.IS_PUBLISHED) return message('Changes kept in this browser until you submit them');
       message('Changes not saved yet');
       clearTimeout(timer);
       timer = setTimeout(() => flush().catch(failed), id ? 1000 : 350);
