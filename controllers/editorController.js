@@ -105,8 +105,7 @@ exports.getEditArticle = async (req, res) => {
     const article = await Article.findById(req.params.id).populate('author', 'name');
     if (!article) v.bad('Not found', 404);
     if (article.status === 'published') {
-      const edit = await Article.findOne({ revisionOf: article._id }).select('status');
-      if (edit?.status === 'pending') v.bad(Article.EDIT_PENDING, 409);
+      const edit = await Article.openEdit(article);
       if (edit) return res.redirect(`/editor/articles/${edit._id}/edit`);
     }
     res.render('editor/article-edit', {
@@ -157,37 +156,41 @@ exports.publishArticle = async (req, res) => {
     if (!article) return res.status(404).json({ error: 'Not found' });
     if (article.status !== 'pending')
       return res.status(400).json({ error: 'Article is not pending.' });
+    v.content(article.toObject(), true);
 
-    let original = null;
-    if (article.revisionOf) {
-      original = await Article.findOne({ _id: article.revisionOf, status: 'published' });
-      if (!original) v.bad('The published article this edit belongs to no longer exists', 409);
-      article.views = original.views;
-      article.replaces = [original._id, ...original.replaces];
+    const originalId = article.revisionOf;
+    if (originalId) {
+      // The original is deleted first, so no new views or comments can reach it,
+      // and its records then move to the edit. The edit is not public yet, so it
+      // has no records of its own to clash with. If this stops halfway, the edit
+      // is still pending and approving it again finishes the job.
+      const original = await Article.findOneAndDelete({ _id: originalId });
+      await Promise.all([
+        Comment.updateMany({ article: originalId }, { $set: { article: article._id } }),
+        ViewStat.updateMany({ article: originalId }, { $set: { article: article._id } }),
+      ]);
+      // The view counter always equals the sum of the article's hourly records.
+      const [stats] = await ViewStat.aggregate([
+        { $match: { article: article._id } },
+        { $group: { _id: null, total: { $sum: '$count' } } },
+      ]);
+      article.views = stats ? stats.total : 0;
+      article.replaces = [originalId, ...(original ? original.replaces : [])];
       article.revisionOf = undefined;
     }
 
     const publishedAt = new Date();
-    v.content(article.toObject(), true);
     article.status = 'published';
     article.publishedAt = publishedAt;
     article.editorNote = '';
-    // Saved first: optimistic concurrency stops a second, simultaneous approval here.
+    // Optimistic concurrency stops a second, simultaneous approval here.
     await article.save();
 
-    if (original) {
-      await Promise.all([
-        Comment.updateMany({ article: original._id }, { $set: { article: article._id } }),
-        ViewStat.updateMany({ article: original._id }, { $set: { article: article._id } }),
-      ]);
-      await Article.deleteOne({ _id: original._id });
-    }
-
-    // Record publish event in view stats (after the move, so it joins the same hour bucket)
+    // Record publish event in view stats
     await recordPublishEvent(article._id, publishedAt);
 
-    logger.info(original
-      ? `Edit ${article._id} approved by editor ${req.session.userId}; it replaced article ${original._id}`
+    logger.info(originalId
+      ? `Edit ${article._id} approved by editor ${req.session.userId}; it replaced article ${originalId}`
       : `Article ${article._id} published by editor ${req.session.userId}`);
     res.json({ ok: true, id: article._id });
   } catch (err) {

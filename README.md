@@ -138,7 +138,7 @@ Every article has exactly one status: **Draft**, **Pending review**, **Published
 
 - Dashboard with own articles and their status: **Draft**, **Pending review**, **Published**, **Returned for corrections**
 - Create articles, edit own drafts, submit for review, see the editor's note on returned articles, fix and resubmit
-- **Auto-save** — work is saved to the server while typing, without pressing Save. Closing the browser, refreshing or switching computers does not lose saved work; reopening the article shows the latest version. A local backup also protects the last keystrokes before the server confirms them
+- **Auto-save** — work is saved to the server while typing, without pressing Save. Closing the browser, refreshing or switching computers does not lose saved work; reopening the article shows the latest version. A local backup also protects the last keystrokes before the server confirms them. The exception is an edit of a published article: it reaches the server only when submitted, and until then it is kept in this browser
 - **Edit published articles** — submitting creates a new article with status **Pending review**, linked to the published one. Readers keep seeing the published version until an editor approves the edit
 
 ### Editor

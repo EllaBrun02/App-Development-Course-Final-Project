@@ -1,0 +1,8 @@
+<%# Edit button in a dashboard row, shared by the reporter and editor screens.
+    A published article whose edit is waiting for review shows the error instead
+    (edit-guard.js); one whose edit was returned opens that edit. %>
+<% if (edit && edit.status === 'pending') { %>
+  <a href="<%= base %>/articles/<%= article._id %>/edit" class="btn btn-sm btn-outline" data-edit-blocked="<%= editPending %>">Edit</a>
+<% } else { %>
+  <a href="<%= base %>/articles/<%= edit ? edit._id : article._id %>/edit" class="btn btn-sm btn-outline">Edit</a>
+<% } %>

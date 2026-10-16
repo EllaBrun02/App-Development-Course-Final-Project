@@ -57,13 +57,20 @@ const EDIT_PENDING =
   'This article already has an edit waiting for review. It must be approved, returned or deleted before another edit can be submitted.';
 articleSchema.statics.EDIT_PENDING = EDIT_PENDING;
 
+// The edit of a published article that is still in progress, if any. One
+// waiting for review blocks editing; one returned for corrections is reopened.
+articleSchema.statics.openEdit = async function (original) {
+  const edit = await this.findOne({ revisionOf: original._id }).select('status');
+  if (edit?.status === 'pending') bad(EDIT_PENDING, 409);
+  return edit;
+};
+
 // Saves an edit of a published article as a new pending article linked to it.
 // The published article itself stays unchanged until the edit is approved.
 articleSchema.statics.submitEdit = async function (original, data) {
   if (original.status !== 'published') bad('Only published articles can receive an edit', 409);
-  const existing = await this.findOne({ revisionOf: original._id }).select('status');
-  if (existing?.status === 'pending') bad(EDIT_PENDING, 409);
-  if (existing) bad('This article already has an edit returned for corrections. Continue that edit instead.', 409);
+  if (await this.openEdit(original))
+    bad('This article already has an edit returned for corrections. Continue that edit instead.', 409);
   try {
     return await this.create({
       ...data,

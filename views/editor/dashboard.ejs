@@ -67,12 +67,7 @@
               </td>
               <td class="col-actions">
                 <a href="/editor/articles/<%= a._id %>" class="btn btn-sm btn-outline">Review</a>
-                <% const edit = edits.get(String(a._id)); %>
-                <% if (edit && edit.status === 'pending') { %>
-                  <a href="/editor/articles/<%= a._id %>/edit" class="btn btn-sm btn-outline" data-edit-blocked="<%= editPending %>">Edit</a>
-                <% } else { %>
-                  <a href="/editor/articles/<%= edit ? edit._id : a._id %>/edit" class="btn btn-sm btn-outline">Edit</a>
-                <% } %>
+                <%- include('../partials/edit-button', { base: '/editor', article: a, edit: edits.get(String(a._id)), editPending }) %>
                 <% if (a.status === 'published') { %>
                   <a href="/article/<%= a._id %>" class="btn btn-sm btn-outline">View Live</a>
                   <a href="/editor/analytics/<%= a._id %>" class="btn btn-sm btn-analytics">Analytics</a>

@@ -45,8 +45,7 @@ exports.getEditArticle = run(async (req, res) => {
   if (!article) v.bad('Article not found', 404);
   if (article.status === 'published') {
     // A published article has at most one edit; continue it instead of starting another.
-    const edit = await Article.findOne({ revisionOf: article._id }).select('status');
-    if (edit?.status === 'pending') v.bad(Article.EDIT_PENDING, 409);
+    const edit = await Article.openEdit(article);
     if (edit) return res.redirect(`/reporter/articles/${edit._id}/edit`);
   }
   res.render('reporter/article-editor', { article, ...context(req) });
