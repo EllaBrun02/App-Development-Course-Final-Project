@@ -183,7 +183,7 @@
       if (b) b.disabled = value;
     }
   }
-  async function act(kind) {
+  async function act(kind, done) {
     if (busy || !editable) return;
     const snapshot = data();
     if (kind !== 'save' && ['title', 'summary', 'content'].some((k) => !snapshot[k].trim())) {
@@ -193,6 +193,7 @@
     if (kind !== 'save' && !confirm('Submit this content for editor review?')) return;
     clearTimeout(timer);
     lock(true);
+    let leaving = false;
     try {
       await enqueue(async () => {
         await ensureId(snapshot);
@@ -203,20 +204,25 @@
         acknowledge(snapshot);
       });
       error.classList.add('hidden');
-      if (kind !== 'save') window.location.href = '/reporter';
+      leaving = true;
+      // Confirm the action, then return to the dashboard; the form stays locked meanwhile.
+      const success = document.getElementById('action-message');
+      success.textContent = `${done} Returning to your dashboard…`;
+      success.classList.remove('hidden');
+      setTimeout(() => (window.location.href = '/reporter'), 1500);
     } catch (e) {
       failed(e);
     } finally {
-      lock(false);
+      if (!leaving) lock(false);
     }
   }
-  for (const [button, kind] of [
-    ['save-draft-btn', 'save'],
-    ['submit-btn', 'submit'],
-    ['submit-update-btn', 'submit-update'],
+  for (const [button, kind, done] of [
+    ['save-draft-btn', 'save', '✓ Draft saved.'],
+    ['submit-btn', 'submit', '✓ Article submitted for review.'],
+    ['submit-update-btn', 'submit-update', '✓ Update submitted for review.'],
   ]) {
     const el = document.getElementById(button);
-    if (el) el.addEventListener('click', () => act(kind));
+    if (el) el.addEventListener('click', () => act(kind, done));
   }
   document.querySelectorAll('a[href]').forEach((link) =>
     link.addEventListener('click', async (e) => {
