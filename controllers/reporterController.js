@@ -22,20 +22,18 @@ async function owned(req) {
   v.revision(a, req.body);
   return a;
 }
-function editable(a, isUpdate) {
-  if (isUpdate) {
-    if (a.status !== 'published' || a.pendingUpdate?.status === 'pending')
-      v.bad('Update cannot be edited in this state', 409);
-  } else if (!['draft', 'returned'].includes(a.status))
+function editable(a) {
+  if (!['draft', 'returned'].includes(a.status))
     v.bad('Article cannot be edited in this state', 409);
 }
 exports.getDashboard = run(async (req, res) => {
   const articles = await Article.find({ author: req.session.userId })
-    .select(
-      'title status category createdAt publishedAt editorNote pendingUpdate.status pendingUpdate.editorNote',
-    )
+    .select('title status category createdAt publishedAt editorNote revisionOf')
     .sort({ updatedAt: -1, _id: -1 });
-  res.render('reporter/dashboard', { articles, ...context(req) });
+  // Edits of published articles have the same author, so they are in this list too.
+  const byId = new Map(articles.map((a) => [String(a._id), a]));
+  const edits = new Map(articles.filter((a) => a.revisionOf).map((a) => [String(a.revisionOf), a]));
+  res.render('reporter/dashboard', { articles, byId, edits, editPending: Article.EDIT_PENDING, ...context(req) });
 });
 exports.getNewArticle = (req, res) =>
   res.render('reporter/article-editor', { article: null, ...context(req) });
@@ -45,6 +43,11 @@ exports.getEditArticle = run(async (req, res) => {
     author: req.session.userId,
   });
   if (!article) v.bad('Article not found', 404);
+  if (article.status === 'published') {
+    // A published article has at most one edit; continue it instead of starting another.
+    const edit = await Article.openEdit(article);
+    if (edit) return res.redirect(`/reporter/articles/${edit._id}/edit`);
+  }
   res.render('reporter/article-editor', { article, ...context(req) });
 });
 exports.createArticle = run(async (req, res) => {
@@ -74,18 +77,16 @@ exports.createArticle = run(async (req, res) => {
   res.status(201).json({ id: a._id, revision: a.__v });
 });
 exports.autoSave = run(async (req, res) => {
-  const a = await owned(req),
-    isUpdate = v.boolean(req.body.isUpdate, 'isUpdate');
-  editable(a, isUpdate);
+  const a = await owned(req);
+  editable(a);
   const data = { ...v.content(req.body), savedAt: new Date() };
-  if (isUpdate) a.pendingUpdate.autoSave = data;
-  else a.autoSave = data;
+  a.autoSave = data;
   await a.save();
   res.json({ ok: true, savedAt: data.savedAt, revision: a.__v });
 });
 exports.saveArticle = run(async (req, res) => {
   const a = await owned(req);
-  editable(a, false);
+  editable(a);
   Object.assign(a, v.content(req.body, a.status === 'returned'));
   a.autoSave = undefined;
   await a.save();
@@ -93,7 +94,7 @@ exports.saveArticle = run(async (req, res) => {
 });
 exports.submitForReview = run(async (req, res) => {
   const a = await owned(req);
-  editable(a, false);
+  editable(a);
   Object.assign(a, v.content(req.body, true));
   a.status = 'pending';
   a.editorNote = '';
@@ -101,15 +102,9 @@ exports.submitForReview = run(async (req, res) => {
   await a.save();
   res.json({ ok: true, revision: a.__v });
 });
+// Editing a published article creates a new pending article linked to it.
 exports.submitUpdate = run(async (req, res) => {
-  const a = await owned(req);
-  editable(a, true);
-  a.pendingUpdate = {
-    ...v.content(req.body, true),
-    status: 'pending',
-    editorNote: '',
-    submittedAt: new Date(),
-  };
-  await a.save();
-  res.json({ ok: true, revision: a.__v });
+  const original = await owned(req);
+  const edit = await Article.submitEdit(original, v.content(req.body, true));
+  res.json({ ok: true, id: edit._id });
 });

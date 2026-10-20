@@ -158,7 +158,7 @@ async function seed() {
     const title = genTitle(i);
 
     // Determine status distribution
-    let status, publishedAt, editorNote, pendingUpdate, autoSave;
+    let status, publishedAt, editorNote, autoSave;
     const roll = i % 10;
 
     if (roll < 6) {
@@ -194,24 +194,30 @@ async function seed() {
     };
     if (autoSave) articleData.autoSave = autoSave;
 
-    // Add pending updates to some published articles (articles 0,10,20,...)
-    if (status === 'published' && i % 10 === 0) {
-      articleData.pendingUpdate = {
-        title: title + ' [Updated]',
-        content: genContent(title + ' — Updated version with new information.'),
-        summary: 'Updated: ' + genSummary(title),
-        image: rand(IMAGES),
-        status: 'pending',
-        editorNote: '',
-        submittedAt: hoursAgo(randInt(1, 12)),
-      };
-    }
-
     articles.push(articleData);
   }
 
   const inserted = await Article.insertMany(articles);
   console.log(`Created ${inserted.length} articles.`);
+
+  // Some published articles (0, 10, 20, ...) have an edit waiting for review:
+  // a separate pending article linked to the published one.
+  const edits = await Article.insertMany(
+    inserted
+      .filter((a, i) => a.status === 'published' && i % 10 === 0)
+      .map((a) => ({
+        title: a.title + ' [Updated]',
+        content: a.content + '\n\nUpdate: new information was added to this story.',
+        summary: 'Updated: ' + a.summary,
+        image: rand(IMAGES),
+        category: a.category,
+        author: a.author,
+        status: 'pending',
+        revisionOf: a._id,
+        createdAt: hoursAgo(randInt(1, 12)),
+      })),
+  );
+  console.log(`Created ${edits.length} pending edits of published articles.`);
 
   // Generate view statistics using the same logic as real views:
   // each simulated view increments ViewStat.count AND Article.views together.

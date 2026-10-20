@@ -2,7 +2,6 @@
   'use strict';
 
   const ARTICLE_ID = window.ARTICLE_ID;
-  const HAS_UPDATE = window.HAS_UPDATE;
 
   const actionMsg = document.getElementById('action-message');
   const returnForm = document.getElementById('return-form');
@@ -24,16 +23,16 @@
     return { res, data: await res.json() };
   }
 
-  // Publish main article
+  // Publish a new article, or approve an edit (it replaces the published version)
   const publishBtn = document.getElementById('publish-btn');
   if (publishBtn) {
     publishBtn.addEventListener('click', async () => {
-      if (!confirm('Publish this article to the public site?')) return;
+      if (!confirm(publishBtn.dataset.confirm)) return;
       publishBtn.disabled = true;
       try {
         const { res, data } = await apiPatch(`/editor/articles/${ARTICLE_ID}/publish`, {});
         if (res.ok) {
-          showMsg('✓ Article published successfully.', 'success');
+          showMsg(publishBtn.dataset.success, 'success');
           setTimeout(() => window.location.href = '/editor', 1500);
         } else {
           showMsg(data.error || 'Failed.', 'error');
@@ -46,39 +45,10 @@
     });
   }
 
-  // Approve pending update
-  const approveUpdateBtn = document.getElementById('approve-update-btn');
-  if (approveUpdateBtn) {
-    approveUpdateBtn.addEventListener('click', async () => {
-      if (!confirm('Approve this update and publish it?')) return;
-      approveUpdateBtn.disabled = true;
-      try {
-        const { res, data } = await apiPatch(`/editor/articles/${ARTICLE_ID}/approve-update`, {});
-        if (res.ok) {
-          showMsg('✓ Update approved and published.', 'success');
-          setTimeout(() => window.location.href = '/editor', 1500);
-        } else {
-          showMsg(data.error || 'Failed.', 'error');
-          approveUpdateBtn.disabled = false;
-        }
-      } catch (e) {
-        showMsg('Network error.', 'error');
-        approveUpdateBtn.disabled = false;
-      }
-    });
-  }
-
   // Show return form
   const returnBtn = document.getElementById('return-btn');
   if (returnBtn) {
     returnBtn.addEventListener('click', () => {
-      returnForm.classList.remove('hidden');
-      editorNote.focus();
-    });
-  }
-  const returnUpdateBtn = document.getElementById('return-update-btn');
-  if (returnUpdateBtn) {
-    returnUpdateBtn.addEventListener('click', () => {
       returnForm.classList.remove('hidden');
       editorNote.focus();
     });
@@ -101,10 +71,7 @@
       if (!note) { alert('Please provide a note explaining what needs to be corrected.'); return; }
       sendReturnBtn.disabled = true;
       try {
-        const { res, data } = await apiPatch(`/editor/articles/${ARTICLE_ID}/return`, {
-          note,
-          isUpdate: HAS_UPDATE,
-        });
+        const { res, data } = await apiPatch(`/editor/articles/${ARTICLE_ID}/return`, { note });
         if (res.ok) {
           showMsg('✓ Article returned to reporter.', 'success');
           setTimeout(() => window.location.href = '/editor', 1500);

@@ -1,11 +1,9 @@
 <%
   let pageTitle, extraHead = '', extraScripts = '';
-  const editingUpdate = editTarget === 'update';
-  // A published article is edited through its pending update. Without one,
-  // the form starts from the live content and saving creates the update.
-  const hasPendingUpdate = !!(article.pendingUpdate && article.pendingUpdate.status === 'pending');
-  const editable = editingUpdate && hasPendingUpdate ? article.pendingUpdate : article;
-  pageTitle = 'Edit: ' + editable.title;
+  // Saving a published article creates a new pending article linked to it.
+  const createsEdit = article.status === 'published';
+  const fixedCategory = createsEdit || !!article.revisionOf;
+  pageTitle = 'Edit: ' + article.title;
   extraScripts = `<script>
     window.ARTICLE_ID = ${JSON.stringify(article._id.toString())};
   </script>
@@ -16,10 +14,10 @@
 <div class="editor-page">
   <div class="dashboard-header">
     <div>
-      <h1><%= !editingUpdate ? 'Edit Article' : hasPendingUpdate ? 'Edit Pending Update' : 'Edit Published Article' %></h1>
+      <h1><%= createsEdit ? 'Edit Published Article' : 'Edit Article' %></h1>
       <p class="analytics-meta">
         By <%= article.author ? article.author.name : '—' %> &bull;
-        <span class="status-badge status-<%= article.status %>"><%= article.status %></span>
+        <%- include('../partials/status-badge', { status: article.status }) %>
       </p>
     </div>
     <div class="header-actions">
@@ -28,19 +26,19 @@
     </div>
   </div>
 
-  <% if (editingUpdate && hasPendingUpdate) { %><p class="info-banner">Changes stay in the pending update until you approve it. The published article remains unchanged.</p><% } %>
-  <% if (editingUpdate && !hasPendingUpdate) { %><p class="info-banner">Your changes will be saved as a pending update. Readers keep seeing the published version until you approve the update on the review page.</p><% } %>
+  <% if (createsEdit) { %><p class="info-banner">Saving creates a new article with status Pending Review, linked to this one. Readers keep seeing the published version until you approve the edit on its review page.</p><% } %>
+  <% if (article.revisionOf) { %><p class="info-banner">This is an edit of a published article. Approving it replaces the <a href="/article/<%= article.revisionOf %>">published version</a>.</p><% } %>
   <div id="edit-message" class="action-message hidden" role="status" aria-live="polite"></div>
 
-  <form id="editor-edit-form" class="article-edit-form" data-edit-target="<%= editTarget %>" data-revision="<%= article.__v %>" data-partial="<%= article.status === 'draft' %>">
+  <form id="editor-edit-form" class="article-edit-form" data-revision="<%= article.__v %>" data-partial="<%= article.status === 'draft' %>">
     <div class="form-group">
       <label for="edit-title">Title <span class="required">*</span></label>
-      <input type="text" id="edit-title" class="form-control" value="<%= editable.title %>" maxlength="200" <%= article.status === 'draft' ? '' : 'required' %> />
+      <input type="text" id="edit-title" class="form-control" value="<%= article.title %>" maxlength="200" <%= article.status === 'draft' ? '' : 'required' %> />
     </div>
 
     <div class="form-group">
       <label for="edit-category">Category</label>
-      <select id="edit-category" class="filter-select" <%= editingUpdate ? 'disabled' : '' %>>
+      <select id="edit-category" class="filter-select" <%= fixedCategory ? 'disabled' : '' %>>
         <% categories.forEach(cat => { %>
           <option value="<%= cat %>" <%= article.category === cat ? 'selected' : '' %>><%= cat %></option>
         <% }); %>
@@ -49,17 +47,17 @@
 
     <div class="form-group">
       <label for="edit-image">Image URL</label>
-      <input type="url" id="edit-image" class="form-control" value="<%= editable.image || '' %>" placeholder="https://..." />
+      <input type="url" id="edit-image" class="form-control" value="<%= article.image || '' %>" placeholder="https://..." />
     </div>
 
     <div class="form-group">
       <label for="edit-summary">Summary <span class="required">*</span></label>
-      <textarea id="edit-summary" class="form-control" rows="3" maxlength="500" <%= article.status === 'draft' ? '' : 'required' %>><%= editable.summary %></textarea>
+      <textarea id="edit-summary" class="form-control" rows="3" maxlength="500" <%= article.status === 'draft' ? '' : 'required' %>><%= article.summary %></textarea>
     </div>
 
     <div class="form-group">
       <label for="edit-content">Content <span class="required">*</span></label>
-      <textarea id="edit-content" class="form-control article-content-textarea" rows="20" maxlength="100000" <%= article.status === 'draft' ? '' : 'required' %>><%= editable.content %></textarea>
+      <textarea id="edit-content" class="form-control article-content-textarea" rows="20" maxlength="100000" <%= article.status === 'draft' ? '' : 'required' %>><%= article.content %></textarea>
     </div>
 
     <div class="form-actions">

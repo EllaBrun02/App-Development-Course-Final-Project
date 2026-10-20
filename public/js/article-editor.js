@@ -55,7 +55,7 @@
           if (typeof cached.data[k] === 'string') document.getElementById(k).value = cached.data[k];
         draftKey = cached.draftKey;
         dirty = true;
-        message('Recovered unsaved work; saving to server…');
+        message(window.IS_PUBLISHED ? 'Recovered your unsubmitted changes' : 'Recovered unsaved work; saving to server…');
       } else {
         showError(
           new Error(
@@ -135,20 +135,23 @@
     dirty = true;
     backup();
     message(
-      'Auto-save failed — changes not saved to server. Retry by editing or pressing Save Draft.',
+      window.IS_PUBLISHED
+        ? 'Not submitted — your changes are kept in this browser.'
+        : 'Auto-save failed — changes not saved to server. Retry by editing or pressing Save Draft.',
     );
     showError(e);
   }
   function flush(keepalive = false) {
     clearTimeout(timer);
     return enqueue(async () => {
-      if (!editable || !dirty) return;
+      // An edit of a published article reaches the server only when submitted.
+      if (!editable || !dirty || window.IS_PUBLISHED) return;
       const snapshot = data();
       message('Saving…');
       await ensureId(snapshot);
       await api(
         `/reporter/articles/${id}/autosave`,
-        { ...snapshot, isUpdate: !!window.IS_PUBLISHED, revision },
+        { ...snapshot, revision },
         'PATCH',
         keepalive,
       );
@@ -164,6 +167,7 @@
     input.addEventListener('input', () => {
       dirty = true;
       backup();
+      if (window.IS_PUBLISHED) return message('Changes kept in this browser until you submit them');
       message('Changes not saved yet');
       clearTimeout(timer);
       timer = setTimeout(() => flush().catch(failed), id ? 1000 : 350);
@@ -179,7 +183,7 @@
       if (b) b.disabled = value;
     }
   }
-  async function act(kind) {
+  async function act(kind, done) {
     if (busy || !editable) return;
     const snapshot = data();
     if (kind !== 'save' && ['title', 'summary', 'content'].some((k) => !snapshot[k].trim())) {
@@ -189,6 +193,7 @@
     if (kind !== 'save' && !confirm('Submit this content for editor review?')) return;
     clearTimeout(timer);
     lock(true);
+    let leaving = false;
     try {
       await enqueue(async () => {
         await ensureId(snapshot);
@@ -199,20 +204,25 @@
         acknowledge(snapshot);
       });
       error.classList.add('hidden');
-      if (kind !== 'save') window.location.href = '/reporter';
+      leaving = true;
+      // Confirm the action, then return to the dashboard; the form stays locked meanwhile.
+      const success = document.getElementById('action-message');
+      success.textContent = `${done} Returning to your dashboard…`;
+      success.classList.remove('hidden');
+      setTimeout(() => (window.location.href = '/reporter'), 1500);
     } catch (e) {
       failed(e);
     } finally {
-      lock(false);
+      if (!leaving) lock(false);
     }
   }
-  for (const [button, kind] of [
-    ['save-draft-btn', 'save'],
-    ['submit-btn', 'submit'],
-    ['submit-update-btn', 'submit-update'],
+  for (const [button, kind, done] of [
+    ['save-draft-btn', 'save', '✓ Draft saved.'],
+    ['submit-btn', 'submit', '✓ Article submitted for review.'],
+    ['submit-update-btn', 'submit-update', '✓ Update submitted for review.'],
   ]) {
     const el = document.getElementById(button);
-    if (el) el.addEventListener('click', () => act(kind));
+    if (el) el.addEventListener('click', () => act(kind, done));
   }
   document.querySelectorAll('a[href]').forEach((link) =>
     link.addEventListener('click', async (e) => {

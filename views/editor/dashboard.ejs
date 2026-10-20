@@ -1,7 +1,7 @@
 <%
   let pageTitle, extraHead = '', extraScripts = '';
   pageTitle = 'Editor Dashboard';
-  extraScripts = '<script src="/js/editor.js"></script>';
+  extraScripts = '<script src="/js/editor.js"></script><script src="/js/edit-guard.js"></script>';
 %>
 <%- include('../partials/header', { pageTitle, extraHead }) %>
 
@@ -19,7 +19,7 @@
       <option value="draft" <%= filterStatus === 'draft' ? 'selected' : '' %>>Draft</option>
       <option value="pending" <%= filterStatus === 'pending' ? 'selected' : '' %>>Pending Review</option>
       <option value="published" <%= filterStatus === 'published' ? 'selected' : '' %>>Published</option>
-      <option value="returned" <%= filterStatus === 'returned' ? 'selected' : '' %>>Returned</option>
+      <option value="returned" <%= filterStatus === 'returned' ? 'selected' : '' %>>Returned for Corrections</option>
     </select>
     <select aria-label="Filter by category" name="category" class="filter-select">
       <option value="">All Categories</option>
@@ -49,20 +49,15 @@
         <tbody>
           <% articles.forEach(a => { %>
             <tr>
-              <td class="col-title"><%= a.title %></td>
-              <td><%= a.author ? a.author.name : '—' %></td>
-              <td><span class="badge"><%= a.category %></span></td>
-              <td>
-                <span class="status-badge status-<%= a.status %>">
-                  <%= a.status === 'draft' ? 'Draft' :
-                      a.status === 'pending' ? 'Pending Review' :
-                      a.status === 'published' ? 'Published' :
-                      'Returned' %>
-                </span>
-                <% if (a.pendingUpdate && a.pendingUpdate.status === 'pending') { %>
-                  <span class="status-badge status-pending tag-small">Update Pending</span>
+              <td class="col-title">
+                <%= a.title %>
+                <% if (a.revisionOf) { %>
+                  <div class="edit-of">&#9998; Edit of: <%= a.revisionOf.title %></div>
                 <% } %>
               </td>
+              <td><%= a.author ? a.author.name : '—' %></td>
+              <td><span class="badge"><%= a.category %></span></td>
+              <td><%- include('../partials/status-badge', { status: a.status }) %></td>
               <td class="col-date">
                 <% if (a.publishedAt) { %>
                   <%= a.publishedAt.toLocaleDateString() %>
@@ -72,7 +67,7 @@
               </td>
               <td class="col-actions">
                 <a href="/editor/articles/<%= a._id %>" class="btn btn-sm btn-outline">Review</a>
-                <a href="/editor/articles/<%= a._id %>/edit" class="btn btn-sm btn-outline">Edit</a>
+                <%- include('../partials/edit-button', { base: '/editor', article: a, edit: edits.get(String(a._id)), editPending }) %>
                 <% if (a.status === 'published') { %>
                   <a href="/article/<%= a._id %>" class="btn btn-sm btn-outline">View Live</a>
                   <a href="/editor/analytics/<%= a._id %>" class="btn btn-sm btn-analytics">Analytics</a>

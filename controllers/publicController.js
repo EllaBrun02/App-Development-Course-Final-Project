@@ -43,11 +43,13 @@ exports.getArticles = async (req, res) => {
     }
 
     // Reading history belongs to the current visitor, not all site readers.
+    // An approved edit replaces an article, so a visit to the old ID counts too.
     const viewedIds = req.session.viewedArticles || [];
     if (viewed === 'viewed') {
-      query._id = { $in: viewedIds };
+      query.$and = [{ $or: [{ _id: { $in: viewedIds } }, { replaces: { $in: viewedIds } }] }];
     } else if (viewed === 'unviewed') {
       query._id = { $nin: viewedIds };
+      query.replaces = { $nin: viewedIds };
     }
 
     const sortOption = sort === 'popularity' ? { views: -1, _id: -1 } : { publishedAt: -1, _id: -1 };
@@ -74,7 +76,12 @@ exports.getArticlePage = async (req, res) => {
   try {
     const article = await Article.findOne({ _id: req.params.id, status: 'published' })
       .populate('author', 'name');
-    if (!article) return res.status(404).render('error', { message: 'Article not found', code: 404 });
+    if (!article) {
+      // The article may have been replaced by an approved edit: send old links there.
+      const replacement = await Article.findOne({ replaces: req.params.id, status: 'published' }).select('_id');
+      if (replacement) return res.redirect(301, `/article/${replacement._id}`);
+      return res.status(404).render('error', { message: 'Article not found', code: 404 });
+    }
 
     // Every visit counts as a view (hourly bucket + article total)
     const recorded = await recordView(article._id);
