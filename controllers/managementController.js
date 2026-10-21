@@ -20,6 +20,7 @@ const handle = (fn) => async (req, res) => {
   }
 };
 
+// Maps the :resource part of the URL to its model; anything not in MODELS is a 404.
 function getModel(req) {
   const model = Object.hasOwn(MODELS, req.params.resource) ? MODELS[req.params.resource] : null;
   if (!model) v.bad('Unknown resource', 404);
@@ -33,6 +34,7 @@ function toJson(item) {
   return obj;
 }
 
+// Parses a date from the request and rejects invalid or future dates.
 function parsePastDate(value, name) {
   const date = new Date(v.text(value, name, 40, true));
   if (!Number.isFinite(date.getTime()) || date > new Date()) v.bad(`Invalid ${name}`);
@@ -65,6 +67,7 @@ async function readUserFields(body, existing, currentUserId) {
   return fields;
 }
 
+// Comment fields: author name and text, trimmed and length-limited.
 function readCommentFields(body, creating) {
   const fields = {};
   for (const [key, max] of [['author', 50], ['body', 1000]]) {
@@ -73,6 +76,8 @@ function readCommentFields(body, creating) {
   return fields;
 }
 
+// View record fields: the hour (rounded down to a whole hour), a nonnegative count
+// and publish events that must fall inside that hour.
 function readViewStatFields(body, existing) {
   const creating = !existing;
   const fields = {};
@@ -98,6 +103,8 @@ function readViewStatFields(body, existing) {
   return fields;
 }
 
+// Reads the fields for the requested resource. Comments and view records must
+// also point to an existing article.
 async function readFields(req, existing) {
   const { body } = req;
   const kind = req.params.resource;
@@ -124,12 +131,15 @@ async function syncArticleViews(articleIds) {
   }
 }
 
+// Renders the data management page; its tables are filled through the JSON handlers below.
 exports.getPage = (req, res) =>
   res.render('editor/manage', {
     user: req.session.userName,
     userRole: req.session.userRole,
   });
 
+// Returns one page of records of the requested type as JSON, newest first, with
+// an optional search and article filter.
 exports.list = handle(async (req, res) => {
   const model = getModel(req);
   const kind = req.params.resource;
@@ -158,18 +168,22 @@ exports.list = handle(async (req, res) => {
   });
 });
 
+// Returns a single record as JSON, without the password hash.
 exports.read = handle(async (req, res) => {
   const item = await getModel(req).findById(req.params.id).select('-passwordHash');
   if (!item) v.bad('Not found', 404);
   res.json({ item: toJson(item) });
 });
 
+// Creates a validated record; a new view record also updates its article's view total.
 exports.create = handle(async (req, res) => {
   const item = await getModel(req).create(await readFields(req));
   if (req.params.resource === 'viewstats') await syncArticleViews([item.article]);
   res.status(201).json({ item: toJson(item) });
 });
 
+// Updates only the fields that were sent. Changing a view record re-syncs the view
+// totals of both its old and new article.
 exports.update = handle(async (req, res) => {
   const item = await getModel(req).findById(req.params.id);
   if (!item) v.bad('Not found', 404);
@@ -180,6 +194,8 @@ exports.update = handle(async (req, res) => {
   res.json({ item: toJson(item) });
 });
 
+// Deletes a record. A user cannot delete their own account, a user who still owns
+// articles, or the last editor.
 exports.remove = handle(async (req, res) => {
   const item = await getModel(req).findById(req.params.id);
   if (!item) v.bad('Not found', 404);

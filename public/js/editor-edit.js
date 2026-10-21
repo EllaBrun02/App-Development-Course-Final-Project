@@ -1,3 +1,4 @@
+// Editor edit page: saves the article with a PATCH request and then opens its review page.
 (function () {
   'use strict';
 
@@ -6,6 +7,7 @@
   const msg = document.getElementById('edit-message');
   const form = document.getElementById('editor-edit-form');
 
+  // Shows a success or error message above the form and scrolls it into view.
   function showMsg(text, type) {
     msg.textContent = text;
     msg.className = 'action-message ' + type;
@@ -13,6 +15,8 @@
     msg.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
   }
 
+  // Checks the required fields, locks the form while saving, and sends the changes
+  // with the revision number so a stale copy is rejected.
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (saveBtn.disabled) return;
@@ -30,6 +34,7 @@
 
     const fields = [...form.querySelectorAll('input, textarea, select')];
     const disabledBeforeSave = fields.map(field => field.disabled);
+    // Re-enables the fields after a failed save, keeping the ones that were disabled before.
     function unlock() {
       fields.forEach((field, index) => { field.disabled = disabledBeforeSave[index]; });
       saveBtn.disabled = false;
