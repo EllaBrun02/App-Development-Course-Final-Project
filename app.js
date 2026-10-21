@@ -31,6 +31,8 @@ app.use('/vendor/chart.js', express.static(path.join(__dirname, 'node_modules', 
 // Allow the validated 100,000-character body, including multi-byte UTF-8 text.
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+// Reject bodies that are not a plain object (null, arrays, bare values) with a 400,
+// so controllers can safely read fields from req.body.
 app.use((req, res, next) => {
   if (req.body !== undefined && (req.body === null || typeof req.body !== 'object' || Array.isArray(req.body))) {
     return res.status(400).json({ error: 'Request body must be an object.' });
@@ -103,6 +105,7 @@ app.use((err, req, res, next) => {
   errorResponse(err, req, res);
 });
 
+// Start the HTTP server, then begin refreshing the weather cache.
 app.listen(PORT, () => {
   logger.info(`The Daily Web server running on http://localhost:${PORT}`);
   startWeatherUpdates(); // keep the shared weather cache fresh in the background

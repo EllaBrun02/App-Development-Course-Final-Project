@@ -3,6 +3,7 @@ const { bad } = require('../utils/validation');
 
 const CATEGORIES = ['Technology', 'Politics', 'Sports', 'Science', 'Business', 'Health', 'Entertainment', 'World'];
 
+// A news article: its content, author, workflow status, auto-saved work and edit links.
 const articleSchema = new mongoose.Schema({
   // Published / current content
   title: { type: String, default: '', maxlength: 200, required: function () { return this.status !== 'draft'; } },

@@ -14,10 +14,12 @@ let indexReady;
 
 const SECRET = getSecret();
 
+// Short HMAC of a value with the app secret: signs device cookies and hides raw keys.
 function sign(value) {
   return crypto.createHmac('sha256', SECRET).update(value).digest('hex').slice(0, 24);
 }
 
+// Creates a random device ID and stores it, signed, in a one-year httpOnly cookie.
 function issueDeviceId(res) {
   const id = crypto.randomBytes(12).toString('hex');
   const cookieValue = `${id}.${sign(id)}`;
@@ -29,6 +31,7 @@ function issueDeviceId(res) {
   return id;
 }
 
+// Returns the device ID from the cookie if its signature is valid; otherwise issues a new one.
 function getDeviceId(req, res) {
   const raw = req.cookies && req.cookies['_did'];
   if (raw) {
@@ -49,6 +52,8 @@ function getDeviceId(req, res) {
   return issueDeviceId(res);
 }
 
+// Records one attempt for this IP or device if it has fewer than MAX_COMMENTS in the
+// last minute. Returns false when the limit is already reached.
 async function reserveAttempt(kind, value, now) {
   // Infrastructure collection, like the session store; no article/user data.
   const store = mongoose.connection.collection('commentLimits');
@@ -74,6 +79,8 @@ async function reserveAttempt(kind, value, now) {
   return result.modifiedCount === 1;
 }
 
+// Middleware for the comment route: both the IP and the device must have an attempt left,
+// otherwise 429. If MongoDB fails, comments are refused (503) rather than left unlimited.
 async function commentRateLimit(req, res, next) {
   try {
     const deviceId = getDeviceId(req, res);

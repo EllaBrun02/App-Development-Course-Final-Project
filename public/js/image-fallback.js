@@ -1,5 +1,7 @@
+// Every page: replaces article images that fail to load with a placeholder image.
 (function () {
   'use strict';
+  // Swaps a broken image for the placeholder (only images marked with data-image-fallback).
   function useFallback(img) {
     if (!(img instanceof HTMLImageElement) || !img.hasAttribute('data-image-fallback')) return;
     // Remove the marker first, so even a missing fallback cannot cause a loop.
