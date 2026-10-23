@@ -1,3 +1,4 @@
+// Article page: posts a reader comment with fetch and adds it to the list without a reload.
 (function () {
   'use strict';
 
@@ -11,12 +12,14 @@
   const authorInput = document.getElementById('comment-author');
   const bodyInput = document.getElementById('comment-body');
 
+  // Escapes HTML characters so comment text is shown as text, not run as markup.
   function escHtml(str) {
     return String(str || '')
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
+  // Formats a date like the server-rendered comments, e.g. "Oct 21, 2026".
   function formatDate(dateStr) {
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
@@ -27,12 +30,15 @@
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
   }
 
+  // Shows a message in the error box and focuses it.
   function showError(msg) {
     errorDiv.textContent = msg;
     errorDiv.classList.remove('hidden');
     errorDiv.focus();
   }
 
+  // Checks the fields, sends the comment, then shows it at the end of the list
+  // and raises the comment count.
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorDiv.classList.add('hidden');

@@ -7,6 +7,7 @@ const v = require('../utils/validation');
 
 const PAGE_SIZE = 20;
 
+// Renders the home page; the article cards are loaded afterwards through the articles API.
 exports.getHome = (req, res) => {
   try {
     res.render('index', {
@@ -72,6 +73,8 @@ exports.getArticles = async (req, res) => {
   }
 };
 
+// Renders a published article with its comments, counts the visit as a view and
+// remembers it in the session for the viewed/unviewed filter.
 exports.getArticlePage = async (req, res) => {
   try {
     const article = await Article.findOne({ _id: req.params.id, status: 'published' })

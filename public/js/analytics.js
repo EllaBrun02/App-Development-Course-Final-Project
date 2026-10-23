@@ -1,3 +1,5 @@
+// Article analytics page: draws the hourly views chart for the chosen time range,
+// with markers where the article was published or updated.
 (function () {
   'use strict';
 
@@ -11,6 +13,7 @@
 
   const HOUR_MS = 3600 * 1000;
 
+  // Converts the time-range option to a number of hours; null means the full history.
   function getHoursAgo(range) {
     if (range === '24h') return 24;
     if (range === '7d') return 24 * 7;
@@ -18,6 +21,7 @@
     return null; // all
   }
 
+  // Rounds a date down to the start of its hour.
   function truncToHour(date) {
     const d = new Date(date);
     d.setMinutes(0, 0, 0);
@@ -51,10 +55,13 @@
     return series;
   }
 
+  // Label for one x-axis point, e.g. "Jan 5, 02:00 PM".
   function formatHour(t) {
     return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
+  // Fetches the view stats for the selected range and (re)draws the chart.
+  // A newer request aborts the older one so a slow response can't overwrite the chart.
   async function loadAndRender() {
     const id = ++requestId;
     if (activeRequest) activeRequest.abort();
@@ -110,6 +117,7 @@
       // at positions belonging to the previous range.
       const publishPlugin = {
         id: 'publishLines',
+        // Draws a dashed line at each publish/update hour, plus a count label when several events share it.
         afterDraw(c) {
           const points = c.config.options.publishPoints || [];
           const ctx = c.ctx;
@@ -161,6 +169,7 @@
             legend: { display: false },
             tooltip: {
               callbacks: {
+                // Lists the publish/update times in the tooltip of a marked hour.
                 afterBody: (items) => {
                   const idx = items[0].dataIndex;
                   const hit = publishPoints.find(p => p.idx === idx);

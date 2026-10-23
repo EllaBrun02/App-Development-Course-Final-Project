@@ -1,3 +1,5 @@
+// Editor management page: list, search, create, edit and delete users, comments and view stats
+// through /editor/api/<resource>.
 (function () {
   const resource = document.getElementById('resource'),
     list = document.getElementById('record-list'),
@@ -28,6 +30,7 @@
       ['count', 'Views', 'number'],
     ],
   };
+  // Disables every control while a save or delete runs, and the paging buttons when they can't be used.
   function syncControls() {
     const controls = [
       resource,
@@ -42,6 +45,7 @@
     document.getElementById('previous').disabled = busy || loading || page === 1;
     document.getElementById('next').disabled = busy || loading || !hasMore;
   }
+  // Calls the JSON API of the selected resource; throws with the server's error message on failure.
   async function api(path = '', method = 'GET', body) {
     const r = await fetch('/editor/api/' + resource.value + path, {
       method,
@@ -55,6 +59,7 @@
     if (!r.ok) throw new Error(data.error);
     return data;
   }
+  // Builds the form fields for the selected resource: filled in when editing an item, empty for a new record.
   function edit(item = {}) {
     id = item._id || null;
     fields.replaceChildren();
@@ -90,6 +95,8 @@
       fields.appendChild(group);
     }
   }
+  // Loads one page of records into the list, each with Edit and Delete buttons.
+  // The request token ignores responses that arrive after a newer load started.
   async function load() {
     const token = ++request;
     loading = true;
@@ -117,6 +124,7 @@
         const remove = document.createElement('button');
         remove.textContent = 'Delete';
         remove.className = 'btn btn-sm btn-danger';
+        // Deletes the record after confirmation, clears the form if it held that record, and reloads the list.
         remove.addEventListener('click', async () => {
           if (busy || !confirm('Delete this record?')) return;
           busy = true;
@@ -148,6 +156,8 @@
       }
     }
   }
+  // Saves the form: PATCH when editing, POST when new. An empty password is dropped so it stays unchanged,
+  // and a view stat's hour is sent as a UTC ISO date.
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (busy) return;
@@ -171,6 +181,7 @@
       syncControls();
     }
   });
+  // Switching resource resets paging, search and the form, then loads the new list.
   resource.addEventListener('change', () => {
     if (busy) return;
     page = 1;
@@ -179,17 +190,20 @@
     edit();
     load();
   });
+  // A new search starts again from page 1.
   document.getElementById('search-form').addEventListener('submit', (e) => {
     e.preventDefault();
     if (busy) return;
     page = 1;
     load();
   });
+  // Go back one page (ignored while a request runs or on the first page).
   document.getElementById('previous').addEventListener('click', () => {
     if (busy || loading || page === 1) return;
     page--;
     load();
   });
+  // Go forward one page, only when the server said more records exist.
   document.getElementById('next').addEventListener('click', () => {
     if (busy || loading || !hasMore) return;
     page++;

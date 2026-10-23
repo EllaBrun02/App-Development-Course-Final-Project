@@ -1,3 +1,4 @@
+// Editor review page: publishes the article or returns it to the reporter with a note.
 (function () {
   'use strict';
 
@@ -7,6 +8,7 @@
   const returnForm = document.getElementById('return-form');
   const editorNote = document.getElementById('editor-note');
 
+  // Shows the result of an action and scrolls it into view.
   function showMsg(text, type) {
     actionMsg.textContent = text;
     actionMsg.className = 'action-message ' + type;
@@ -14,6 +16,7 @@
     actionMsg.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   }
 
+  // Sends a PATCH request with a JSON body and returns both the response and its data.
   async function apiPatch(url, body) {
     const res = await fetch(url, {
       method: 'PATCH',
@@ -26,6 +29,7 @@
   // Publish a new article, or approve an edit (it replaces the published version)
   const publishBtn = document.getElementById('publish-btn');
   if (publishBtn) {
+    // After confirmation, publishes and goes back to the dashboard.
     publishBtn.addEventListener('click', async () => {
       if (!confirm(publishBtn.dataset.confirm)) return;
       publishBtn.disabled = true;
@@ -66,6 +70,7 @@
   // Send return
   const sendReturnBtn = document.getElementById('send-return-btn');
   if (sendReturnBtn) {
+    // Requires a note, sends the article back to the reporter, then goes back to the dashboard.
     sendReturnBtn.addEventListener('click', async () => {
       const note = editorNote.value.trim();
       if (!note) { alert('Please provide a note explaining what needs to be corrected.'); return; }

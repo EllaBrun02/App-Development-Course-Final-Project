@@ -10,6 +10,7 @@ router.param('id', (req, res, next, id) => {
   try { objectId(id); next(); } catch (err) { next(err); }
 });
 
+// Middleware that lets only logged-in editors through; used on every route below.
 const isEditor = requireRole('editor');
 
 // Articles: dashboard, review, edit and workflow actions

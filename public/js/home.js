@@ -1,3 +1,4 @@
+// Home page news feed: search, filters, sort and infinite scroll over /api/articles.
 (function () {
   'use strict';
 
@@ -27,6 +28,7 @@
   const viewedFilter = document.getElementById('viewed-filter');
   const sortSelect = document.getElementById('sort-select');
 
+  // Collects the active search/filter/sort values as query params; default values are left out.
   function stateParams() {
     const params = new URLSearchParams();
     if (currentSearch) params.set('search', currentSearch);
@@ -36,6 +38,7 @@
     return params;
   }
 
+  // API URL for the next page of the feed with the current filters.
   function buildUrl() {
     const params = stateParams();
     params.set('page', page);
@@ -48,11 +51,13 @@
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
   }
 
+  // Formats a date like "Jan 5, 2026" for the card's meta line.
   function formatDate(dateStr) {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
+  // Builds the HTML for one article card; text is escaped, and a card without an image gets a placeholder.
   function renderCard(article) {
     const imgHtml = article.image
       ? `<div class="article-card-img"><img src="${escHtml(article.image)}" alt="${escHtml(article.title)}" loading="lazy" data-image-fallback></div>`
@@ -79,6 +84,7 @@
       </article>`;
   }
 
+  // Escapes HTML special characters so article text can be inserted into markup safely.
   function escHtml(str) {
     if (!str) return '';
     return String(str)
@@ -89,6 +95,8 @@
       .replace(/'/g, '&#39;');
   }
 
+  // Fetches the next page of articles and appends it; reset=true starts over from page 1.
+  // requestId and the AbortController drop stale responses so results of different filters never mix.
   async function loadArticles(reset) {
     if (!reset && (loading || !hasMore)) return;
     if (reset && activeRequest) activeRequest.abort();
@@ -114,6 +122,7 @@
       hasMore = data.hasMore;
       if (page === 1 && data.articles.length === 0) {
         feed.innerHTML = '<div class="feed-empty"><h3>No stories found</h3><p>Try another search or change your filters.</p><button class="btn btn-outline" id="clear-filters">Clear filters</button></div>';
+        // "Clear filters" in the empty state resets every filter and reloads the feed.
         document.getElementById('clear-filters').addEventListener('click', () => {
           currentSearch = currentCategory = currentViewed = '';
           currentSort = 'date';
@@ -129,6 +138,7 @@
       const message = document.createElement('div');
       message.className = 'feed-empty';
       message.innerHTML = '<h3>Stories couldn’t be loaded</h3><p>Check your connection and try again.</p><button class="btn btn-outline">Try again</button>';
+      // "Try again" removes the error message and retries the same page.
       message.querySelector('button').addEventListener('click', () => {
         message.remove();
         hasMore = true;
@@ -158,6 +168,7 @@
   function attachImageFallbacks() {
     feed.querySelectorAll('.article-card-img img:not([data-fallback])').forEach(img => {
       img.dataset.fallback = '1';
+      // Replace a broken image with the placeholder.
       img.addEventListener('error', () => {
         const wrap = img.closest('.article-card-img');
         if (wrap) wrap.innerHTML = '<div class="article-card-img-placeholder">📰</div>';
@@ -165,6 +176,7 @@
     });
   }
 
+  // Highlights the selected sidebar category, updates the URL and reloads the feed from page 1.
   function resetAndLoad() {
     document.querySelectorAll('.category-link').forEach(link => {
       link.setAttribute('aria-current', String(link.dataset.category === currentCategory));
@@ -180,15 +192,18 @@
   viewedFilter.value = currentViewed;
   sortSelect.value = currentSort;
 
+  // The search button searches right away.
   searchBtn.addEventListener('click', () => {
     currentSearch = searchInput.value.trim();
     resetAndLoad();
   });
 
+  // Pressing Enter in the search box also searches right away.
   searchInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') { currentSearch = searchInput.value.trim(); resetAndLoad(); }
   });
 
+  // Typing searches automatically after a 400 ms pause (debounce), so not every keystroke sends a request.
   searchInput.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -197,6 +212,7 @@
     }, 400);
   });
 
+  // Each dropdown change updates its filter and reloads the feed.
   categoryFilter.addEventListener('change', () => {
     currentCategory = categoryFilter.value;
     resetAndLoad();
@@ -214,6 +230,7 @@
 
   // Sidebar category links
   document.querySelectorAll('.category-link').forEach(link => {
+    // Selects the category, syncs the dropdown and scrolls to the feed (no smooth scroll with reduced motion).
     link.addEventListener('click', e => {
       e.preventDefault();
       const cat = link.dataset.category;

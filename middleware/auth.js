@@ -6,6 +6,7 @@ function wantsJson(req) {
     req.xhr || req.headers.accept?.includes('application/json');
 }
 
+// Answers 401 to API calls, or sends a page visitor to the login page.
 function notLoggedIn(req, res) {
   if (wantsJson(req)) {
     return res.status(401).json({ error: 'Authentication required' });
@@ -16,6 +17,7 @@ function notLoggedIn(req, res) {
 // Server-side permission check. The role comes from the user record in the
 // database, never from anything the browser sends.
 function requireRole(...roles) {
+  // The actual middleware Express runs on each request to a protected route.
   return async (req, res, next) => {
     if (!req.session.userId) return notLoggedIn(req, res);
 

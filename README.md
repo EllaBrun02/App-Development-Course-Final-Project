@@ -138,6 +138,7 @@ Every article has exactly one status: **Draft**, **Pending review**, **Published
 
 - Dashboard with own articles and their status: **Draft**, **Pending review**, **Published**, **Returned for corrections**
 - Create articles, edit own drafts, submit for review, see the editor's note on returned articles, fix and resubmit
+- **Save Draft**, **Submit for Review** and **Submit Update for Review** show a green success message and return to the dashboard after 1.5 seconds. If the action fails, the reporter stays on the page and sees the error
 - **Auto-save** — work is saved to the server while typing, without pressing Save. Closing the browser, refreshing or switching computers does not lose saved work; reopening the article shows the latest version. A local backup also protects the last keystrokes before the server confirms them. The exception is an edit of a published article: it reaches the server only when submitted, and until then it is kept in this browser
 - **Edit published articles** — submitting creates a new article with status **Pending review**, linked to the published one. Readers keep seeing the published version until an editor approves the edit
 
@@ -158,6 +159,19 @@ Every article has exactly one status: **Draft**, **Pending review**, **Published
 - Invalid input, invalid IDs and unauthorized actions return clear errors without crashing the server. Article workflow changes use optimistic concurrency to reject stale saves
 - Errors and important events are logged to `logs/app.log`; HTTP requests to `logs/access.log`
 - Indexes and server-side paging keep the feed, dashboards and analytics fast with thousands of articles
+
+## Change Log
+
+### Reporter actions confirm and return to the dashboard (PR #12)
+
+- **Problem:** clicking **Save Draft** kept the reporter on the editor page and showed no success message, so it looked like nothing happened.
+- **Cause:** the save itself worked. The client script (`public/js/article-editor.js`) intentionally stayed on the page after a draft save, and its only feedback was the small status line changing to "Saved to server", the same text auto-save already shows. Submit for Review and Submit Update did return to the dashboard, but with no confirmation.
+- **Change:** all three buttons now show a success message (`✓ Draft saved.`, `✓ Article submitted for review.`, `✓ Update submitted for review.`), keep the form locked so nothing is typed that would not be saved, and return to `/reporter` after 1.5 seconds. This matches the editor's publish flow in `public/js/editor-review.js`. If the request fails, the form unlocks and shows the error. Server code is unchanged.
+- **Files:** `public/js/article-editor.js`, `views/reporter/article-editor.ejs`.
+
+### Function comments
+
+The functions in the server code (`app.js`, `config/`, `routes/`, `middleware/`, `models/`, `controllers/`, `utils/`) and the browser scripts (`public/js/`) have short comments saying what they do and, where not obvious, why. Tiny one-line callbacks are left uncommented. Only comment lines were added; no code changed.
 
 ## Troubleshooting
 

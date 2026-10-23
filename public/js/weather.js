@@ -13,11 +13,13 @@
   let refreshTimer;
   let refreshing = false;
 
+  // Sets an element's text, if that element is on the page.
   function setText(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
   }
 
+  // Replaces the values with placeholders and shows the "unavailable" note.
   function showUnavailable() {
     setText('weather-temp', '--');
     setText('weather-wind', 'Wind: --');
@@ -28,6 +30,7 @@
     document.getElementById('weather-stale')?.classList.remove('hidden');
   }
 
+  // Schedules the next server request, replacing any pending one.
   function scheduleRefresh(ms) {
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(refresh, ms);
@@ -41,6 +44,7 @@
       showUnavailable();
       return false;
     }
+    // When the value expires: clear it, then ask for the next observation shortly after.
     expiryTimer = setTimeout(() => {
       showUnavailable();
       scheduleRefresh(NEXT_OBSERVATION_MS);
@@ -66,6 +70,8 @@
     return open + body + '</svg>';
   }
 
+  // Fetches the latest weather from /api/weather and updates the widget.
+  // If the request fails or the value is already expired, clears the widget and retries later.
   async function refresh() {
     if (refreshing) return;
     refreshing = true;
