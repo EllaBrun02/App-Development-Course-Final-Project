@@ -9,6 +9,7 @@ const crypto = require('crypto');
 //    without shipping a known default secret in the repository.
 const SECRET_FILE = path.join(__dirname, '..', 'config', 'session-secret.key');
 
+// Returns the secret to sign session cookies with, creating the key file on first run.
 function getSecret() {
   if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
   try {

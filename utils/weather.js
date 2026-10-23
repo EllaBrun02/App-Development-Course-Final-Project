@@ -23,11 +23,14 @@ const WMO_CODES = {
   95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Thunderstorm with heavy hail',
 };
 
+// Placeholder shown when there is no fresh observation.
 const UNAVAILABLE = () => ({
   city: CITY, temp: '--', description: 'Currently unavailable', windspeed: '--',
   observedAt: null, expiresAt: null, stale: true,
 });
 
+// Asks Open-Meteo for the current weather and returns it in the shape the views use;
+// throws if the request fails or the observation is invalid or too old.
 async function fetchObservation() {
   const res = await fetch(API_URL, { signal: AbortSignal.timeout(REQUEST_TIMEOUT) });
   if (!res.ok) throw new Error(`Status ${res.status}`);
@@ -73,6 +76,7 @@ async function refresh() {
   setTimeout(refresh, Math.max(delay, 1000)).unref(); // the timer alone should not keep the process alive
 }
 
+// Starts the refresh loop once, when the server starts.
 function startWeatherUpdates() {
   if (started) return;
   started = true;

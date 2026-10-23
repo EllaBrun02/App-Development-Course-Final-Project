@@ -9,10 +9,12 @@ const WORDS = /\s+|\S+/g;
 // rewrite cannot slow the server down.
 const MAX_CELLS = 2000000;
 
+// Breaks text into tokens (lines or words, depending on the pattern).
 function split(text, pattern) {
   return String(text ?? '').match(pattern) || [];
 }
 
+// Adds one part of the given type for each token.
 function add(ops, type, tokens) {
   for (const text of tokens) ops.push({ type, text });
 }

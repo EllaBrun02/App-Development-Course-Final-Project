@@ -7,6 +7,8 @@ const { diffWords } = require('../utils/diff');
 
 const DASHBOARD_PAGE_SIZE = 50;
 
+// Renders the editor dashboard: all articles, filtered by status, category and
+// title search, 50 per page.
 exports.getDashboard = async (req, res) => {
   try {
     const { status, category, search } = req.query;
@@ -64,6 +66,8 @@ exports.getDashboard = async (req, res) => {
   }
 };
 
+// Renders the review page for any article. An edit is shown as a word diff
+// against the published article it would replace.
 exports.getArticleReview = async (req, res) => {
   try {
     const article = await Article.findById(req.params.id)
@@ -119,6 +123,8 @@ exports.getEditArticle = async (req, res) => {
   }
 };
 
+// Saves an editor's changes to any article. For a published article it creates a
+// linked pending edit instead, and the category cannot change.
 exports.editArticle = async (req, res) => {
   try {
     const article = await Article.findById(req.params.id);
@@ -281,6 +287,8 @@ exports.getAnalyticsData = async (req, res) => {
   }
 };
 
+// Adds the publish time to that hour's view record so the analytics graph can mark it.
+// A failure is only logged, because the article is already published.
 async function recordPublishEvent(articleId, time) {
   const hour = new Date(time.getFullYear(), time.getMonth(), time.getDate(), time.getHours());
   try {

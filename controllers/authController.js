@@ -7,6 +7,7 @@ const FAIL_WINDOW_MS = 15 * 60 * 1000;
 const MAX_FAILED_ATTEMPTS = 10;
 const failedLogins = new Map(); // ip -> [timestamp, ...]
 
+// Drops failed attempts older than the window and returns the ones left for this IP.
 function recentFailures(ip) {
   const now = Date.now();
   const list = (failedLogins.get(ip) || []).filter(t => now - t < FAIL_WINDOW_MS);
@@ -14,6 +15,7 @@ function recentFailures(ip) {
   return list;
 }
 
+// Shows the login page; a user who is already logged in goes straight to their dashboard.
 exports.getLogin = (req, res) => {
   if (req.session.userId) {
     return res.redirect(req.session.userRole === 'editor' ? '/editor' : '/reporter');
@@ -21,6 +23,8 @@ exports.getLogin = (req, res) => {
   res.render('login', { error: null });
 };
 
+// Checks the username and password, starts a new session and redirects by role.
+// Failed attempts are counted per IP and blocked after too many.
 exports.postLogin = async (req, res) => {
   const { username, password } = req.body;
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
@@ -64,6 +68,7 @@ exports.postLogin = async (req, res) => {
   }
 };
 
+// Ends the session and returns to the home page.
 exports.logout = (req, res) => {
   req.session.destroy(() => res.redirect('/'));
 };

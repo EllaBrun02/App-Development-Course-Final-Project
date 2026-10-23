@@ -3,6 +3,8 @@ const Article = require('../models/Article');
 const logger = require('../utils/logger');
 const v = require('../utils/validation');
 
+// Validates the name and text, adds a comment to a published article and returns
+// it as JSON so the page can show it without reloading.
 exports.addComment = async (req, res) => {
   try {
     const { author, body } = req.body;

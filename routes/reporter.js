@@ -9,8 +9,11 @@ router.param('id', (req, res, next, id) => {
   try { objectId(id); next(); } catch (err) { next(err); }
 });
 
+// Middleware that lets only logged-in reporters through; used on every route below.
 const isReporter = requireRole('reporter');
 
+// Reporter dashboard, writing a new article, editing it (auto-save and manual save),
+// submitting it for review and submitting an update of a published article.
 router.get('/', isReporter, rc.getDashboard);
 router.get('/new', isReporter, rc.getNewArticle);
 router.post('/articles', isReporter, rc.createArticle);
